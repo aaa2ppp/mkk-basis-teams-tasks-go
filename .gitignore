@@ -1,0 +1,17 @@
+.*
+!.gitignore
+*.exe
+*.bin
+*.pprof
+*.out
+*~
+*.bak
+*.bak[0-9]
+tmp/
+bak/
+bak[0-9]/
+bin/
+benchmarks/
+external/
+go.work
+go.work.sum

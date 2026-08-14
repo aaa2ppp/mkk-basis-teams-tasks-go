@@ -1,0 +1,50 @@
+services:
+  db:
+    image: mariadb:12.3.2-noble
+    env_file: 
+      - ./.env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-app-db}
+      MYSQL_USER: ${DB_USER:-app-user}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: sh -c 'mariadb -u ${DB_USER:-app-user} -p${DB_PASSWORD} -e "select 1;" ${DB_NAME:-app-name}'
+      interval: 2s
+      timeout: 5s
+      retries: 5
+  
+  migrate:
+    build:
+      target: migrate 
+    env_file:
+      - ./.env
+    environment:
+      - DB_ADDR=db:5432
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  server:
+    build:
+      target: server
+    ports:
+      - "8080:8080"
+    env_file: 
+      - ./.env
+    environment:
+      - DB_ADDR=db:5432
+      - SERVER_ADDR=0.0.0.0:8080
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  mysql_data:

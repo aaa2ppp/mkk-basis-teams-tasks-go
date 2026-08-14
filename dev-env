@@ -1,0 +1,20 @@
+#!/bin/sh
+# Usage: . dev-env
+
+gobin="$(go env GOPATH)/bin"
+case ":${PATH}:" in
+    *":$gobin:"*) ;;
+    *) export PATH="$PATH:$gobin" ;;
+esac
+
+if ! [ -f .env ]; then
+    echo "FAIL: .env not found" >&2
+    return 1
+fi
+
+if ! eval export $(grep -v '^#' .env); then
+    echo "FAIL: .env parse error" >&2 && \
+    return 1
+fi
+
+echo "DONE: .env loaded" >&2

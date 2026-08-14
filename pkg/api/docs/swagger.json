@@ -1,0 +1,13 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "Сервис для управления задачами внутри команд",
+        "contact": {},
+        "license": {
+            "name": "Apache 2.0"
+        },
+        "version": "1.0"
+    },
+    "basePath": "/api",
+    "paths": {}
+}

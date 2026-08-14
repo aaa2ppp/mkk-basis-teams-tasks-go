@@ -1,0 +1,9 @@
+basePath: /api
+info:
+  contact: {}
+  license:
+    name: Apache 2.0
+  title: Сервис для управления задачами внутри команд
+  version: "1.0"
+paths: {}
+swagger: "2.0"
