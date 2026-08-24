@@ -112,6 +112,9 @@ func (s *service) AddMember(ctx context.Context, req SvcAddMemberReq) error {
 	if err != nil {
 		return err
 	}
+	if role := curUser.TeamRoles[req.TeamID.String()]; role != model.RoleOwner && role != model.RoleAdmin {
+		return model.ErrForbidden
+	}
 	return s.storage.AddMember(ctx, DBAddMemberReq{
 		TeamID:     req.TeamID,
 		UserID:     req.UserID,
@@ -214,6 +217,9 @@ func (s *service) GenReport(ctx context.Context, teamID model.TeamID) ([]Metric,
 	curUser, err := auth.GetCurrentUser(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if role := curUser.TeamRoles[teamID.String()]; role != model.RoleOwner && role != model.RoleAdmin {
+		return nil, model.ErrForbidden
 	}
 	return s.storage.GenReport(ctx, DBGenReportReq{
 		TeamID:    teamID,

@@ -36,6 +36,8 @@ func mapError(err error) *HttpError {
 		return &HttpError{err.Error(), http.StatusNotImplemented}
 	case errors.Is(err, model.ErrForbidden):
 		return &HttpError{err.Error(), http.StatusForbidden}
+	case errors.Is(err, model.ErrNoRowsAffected):
+		return &HttpError{err.Error(), http.StatusConflict}
 	}
 	return nil
 }

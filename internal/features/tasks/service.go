@@ -182,6 +182,10 @@ func (s *service) Create(ctx context.Context, req SvcCreateReq) (model.Task, err
 		return zero, fmt.Errorf("%w: %v", model.ErrUnauthorized, err)
 	}
 
+	if curUser.TeamRoles[req.TeamID.String()] == 0 {
+		return zero, model.ErrForbidden
+	}
+
 	var task model.Task
 	if err := s.transactor.InTx(ctx, func(ctx context.Context, tx db.DBTX) (err error) {
 		storage := s.storage.WithTx(tx)
@@ -252,7 +256,7 @@ func (s *service) List(ctx context.Context, req SvcListReq) ([]model.Task, error
 		return nil, err
 	}
 
-	if _, ok := curUser.TeamRoles[req.TeamID.String()]; !ok {
+	if req.TeamID != 0 && curUser.TeamRoles[req.TeamID.String()] == 0 {
 		return nil, model.ErrForbidden
 	}
 

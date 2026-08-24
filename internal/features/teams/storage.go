@@ -123,8 +123,7 @@ func (s *storage) AddMember(ctx context.Context, req DBAddMemberReq) error {
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("%w: user not found or creator(%d) not owner or admin of team(%v)",
-			model.ErrForbidden, req.CurUserID, req.TeamID)
+		return model.ErrNoRowsAffected
 	}
 	return nil
 }

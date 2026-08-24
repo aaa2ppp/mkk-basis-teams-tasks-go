@@ -74,8 +74,7 @@ func (s *storage) Create(ctx context.Context, req DBCreateReq) (model.TaskID, er
 		return 0, err
 	}
 	if n == 0 {
-		return 0, fmt.Errorf("%w: creator(%v) or assignee(%v) not member of team(%v)",
-			model.ErrForbidden, req.CreatedBy, req.AssigneeID, req.TeamID)
+		return 0, model.ErrNoRowsAffected
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -112,16 +111,16 @@ func (s *storage) GetByID(ctx context.Context, req DBGetByIDReq) (model.Task, er
 	row := s.db.QueryRowContext(ctx, query, args...)
 
 	var r model.Task
-	err := row.Scan(&r.ID, &r.TeamID, &r.Title, &r.Description, &r.Status, &r.CreatedBy, &r.AssigneeID,
-		&r.CreatedAt, &r.UpdatedAt, &r.ClosedAt, &r.Version)
-	if err != nil {
+	if err := row.Scan(&r.ID, &r.TeamID, &r.Title, &r.Description, &r.Status, &r.CreatedBy, &r.AssigneeID,
+		&r.CreatedAt, &r.UpdatedAt, &r.ClosedAt, &r.Version,
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.Task{}, fmt.Errorf("%w: tasks.task_id=%d", model.ErrNotFound, req.TaskID)
 		}
 		return model.Task{}, err
 	}
 
-	return r, err
+	return r, nil
 }
 
 func (s *storage) List(ctx context.Context, req DBListReq) ([]model.Task, error) {
@@ -350,7 +349,7 @@ func (s *storage) Update(ctx context.Context, req DBUpdateReq) error {
 		return err
 	}
 	if n == 0 {
-		return model.ErrForbidden
+		return model.ErrNoRowsAffected
 	}
 
 	return nil
@@ -396,7 +395,7 @@ func (s *storage) AddComment(ctx context.Context, req DBAddCommentReq) (model.Ta
 		return 0, err
 	}
 	if n == 0 {
-		return 0, model.ErrForbidden
+		return 0, model.ErrNoRowsAffected
 	}
 
 	id, err := res.LastInsertId()
