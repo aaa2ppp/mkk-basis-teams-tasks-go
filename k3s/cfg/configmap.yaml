@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  LOG_LEVEL: "DEBUG"
+  DB_NAME: "app-db"
+  DB_USER: "app-user"
+  DB_ADDR: "db:3306"
+  REDIS_ADDR: "redis:6379"

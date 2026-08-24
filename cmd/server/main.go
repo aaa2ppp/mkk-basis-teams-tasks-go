@@ -7,17 +7,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/config"
+	database "aaa2ppp/teams-tasks/internal/db"
+	"aaa2ppp/teams-tasks/internal/features/sign"
+	"aaa2ppp/teams-tasks/internal/features/tasks"
+	"aaa2ppp/teams-tasks/internal/features/teams"
+	"aaa2ppp/teams-tasks/internal/lib/auth"
+	"aaa2ppp/teams-tasks/internal/lib/logging"
 	"aaa2ppp/teams-tasks/pkg/api/docs"
 
-	"aaa2ppp/teams-tasks/internal/api"
-	"aaa2ppp/teams-tasks/internal/config"
-	"aaa2ppp/teams-tasks/internal/lib/logging"
-	"aaa2ppp/teams-tasks/internal/service"
-	"aaa2ppp/teams-tasks/internal/storage/mysqlStorage"
-
+	"github.com/redis/go-redis/v9"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -26,7 +29,7 @@ import (
 //	@title			Сервис для управления задачами внутри команд
 //	@version		1.0
 //	@license.name	Apache 2.0
-//	@basepath		/api
+//	@basepath		/api/v1
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -45,30 +48,62 @@ func main() {
 }
 
 func run(ctx context.Context, cfg config.Config) (err error) {
-	logger := logging.New(cfg.Logger)
+	logger := logging.New(cfg.Log)
 
-	repo, err := mysqlStorage.Open(ctx, cfg.DB)
+	db, err := database.Open(ctx, cfg.DB)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = errors.Join(err, repo.Close())
+		err = errors.Join(err, db.Close())
 	}()
+	tansactor := database.NewTransactor(db)
 
-	svc := service.New(repo)
-	api := api.New(svc)
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       0, // use default DB
+	})
+	defer rdb.Close() //nolint:errcheck
 
 	router := http.NewServeMux()
-	router.Handle("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
+	tokens := auth.New(cfg.Auth)
 
-	if base := docs.SwaggerInfo.BasePath; base == "/" {
-		router.Handle("/", api)
-	} else {
-		router.Handle(base+"/", http.StripPrefix(base, api))
-	}
+	signAPI := sign.NewAPI(
+		sign.NewService(
+			sign.NewStorage(db),
+			tansactor,
+			tokens,
+		),
+	)
+	teamsAPI := tokens.Middleware(
+		teams.NewAPI(
+			teams.NewService(
+				teams.NewStorage(db),
+				tansactor,
+			),
+		),
+	)
+	tasksAPI := tokens.Middleware(
+		tasks.NewAPI(
+			tasks.NewService(
+				tasks.NewStorage(db),
+				tansactor,
+				tasks.NewCache(rdb, 5*time.Minute),
+			),
+		),
+	)
+
+	base := strings.TrimRight(docs.SwaggerInfo.BasePath, "/")
+	router.Handle(base+"/", http.StripPrefix(base, signAPI))
+	router.Handle(base+"/teams/", http.StripPrefix(base, teamsAPI))
+	router.Handle(base+"/tasks/", http.StripPrefix(base, tasksAPI))
+
+	swagger := httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))
+	router.Handle("/swagger/", swagger)
 
 	server := http.Server{
-		Handler:      requestTimeout(cfg.Server.RequestTimeout, logging.HTTPLogging(logger, router)),
+		Handler:      requestTimeout(cfg.Server.RequestTimeout, logging.Middleware(logger, router)),
 		Addr:         cfg.Server.Addr,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,

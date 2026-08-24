@@ -5,13 +5,15 @@ import (
 	"os"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
+	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/lib/getval"
 	"aaa2ppp/teams-tasks/internal/lib/logging"
-	"aaa2ppp/teams-tasks/internal/storage"
 )
 
-type Logger = logging.Config
-type DB = storage.DBConfig
+type Log = logging.Config
+type DB = db.Config
+type Auth = auth.Config
 
 type Server struct {
 	Addr            string
@@ -21,10 +23,19 @@ type Server struct {
 	RequestTimeout  time.Duration
 }
 
+type Redis struct {
+	Addr     string
+	Password string
+	DB       int
+	Timeout  time.Duration
+}
+
 type Config struct {
-	Logger Logger
+	Log    Log
 	DB     DB
 	Server Server
+	Auth   Auth
+	Redis  Redis
 }
 
 const (
@@ -36,7 +47,7 @@ func Load() (Config, error) {
 	gv := getval.New(os.LookupEnv)
 
 	cfg := Config{
-		Logger: Logger{
+		Log: Log{
 			Level:     gv.LogLevel("LOG_LEVEL", optional, slog.LevelInfo),
 			Plaintext: gv.Bool("LOG_PLAINTEXT", optional, false),
 		},
@@ -52,6 +63,17 @@ func Load() (Config, error) {
 			WriteTimeout:    gv.Duration("SERVER_WRITE_TIMEOUT", optional, 5*time.Second),
 			RequestTimeout:  gv.Duration("SERVER_REQUEST_TIMEOUT", optional, 5*time.Second),
 			ShutdownTimeout: gv.Duration("SERVER_SHUTDOWN_TIMEOUT", optional, 10*time.Second),
+		},
+		Auth: Auth{
+			Secret:        gv.String("AUTH_SECRET", required, ""),
+			TokenHeader:   gv.String("AUTH_TOKEN_HEADER", optional, "X-Authtoken"),
+			TokenLifetime: gv.Duration("AUTH_TOKEN_LIFETIME", optional, 15*time.Minute),
+		},
+		Redis: Redis{
+			Addr:     gv.String("REDIS_ADDR", required, ""),
+			Password: gv.String("REDIS_PASSWORD", required, ""),
+			DB:       gv.Int("REDIS_DB", optional, 0),
+			Timeout:  gv.Duration("REDIS_TIMEOUT", optional, 5*time.Second),
 		},
 	}
 

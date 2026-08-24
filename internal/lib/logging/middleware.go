@@ -25,9 +25,9 @@ type requestInfo struct {
 	PanicErr error
 }
 
-// HTTPLogging создает middleware для логирования HTTP-запросов. Принимает логгер
+// Middleware создает middleware для логирования HTTP-запросов. Принимает логгер
 // и следующий обработчик в цепочке, возвращает новый обработчик с логированием.
-func HTTPLogging(log *slog.Logger, h http.Handler) http.Handler {
+func Middleware(log *slog.Logger, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqInfo := requestInfo{
 			ID:     rand.Uint64(),
@@ -49,7 +49,7 @@ func HTTPLogging(log *slog.Logger, h http.Handler) http.Handler {
 		// TODO: добавить мету к контексту (rid... etc), чтобы можно было связать лог с ответами сервера
 
 		// Добавляем логгер в контекст запроса
-		ctx := Context(r.Context(), log)
+		ctx := contextWithLogger(r.Context(), log)
 		r = r.WithContext(ctx)
 
 		// Засекаем время

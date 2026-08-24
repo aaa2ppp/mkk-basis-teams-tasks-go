@@ -4,19 +4,20 @@ BIN_DIR     ?= ./bin
 GOEXE       := $(shell go env GOEXE)
 BUILD_FLAGS ?=
 
-# tip: to disable all linters can set LINT=true
-LINT ?= golangci-lint
+# tip: to disable all linters can set LINTER=true
+LINTER ?= golangci-lint
 
 DOCKER_COMPOSE    ?= docker compose
 APP_SERVICE       := server
 DB_SERVICE        := db
 MIGRATE_SERVICE   := migrate
+REDIS_SERVICE     := redis
 
 WAIT_DB_READY     := sh scripts/wait-db-ready.sh
 MIGRATE           := sh scripts/migrate.sh
 MERGE_CODE        := sh scripts/merge-code.sh
 
-SWAG_SOURCE_DIRS  := ./cmd/$(APP_SERVICE) ./internal/model ./internal/api
+SWAG_SOURCE_DIRS  := ./cmd/$(APP_SERVICE) ./internal/model ./internal/features
 SWAG_SOURCES      := $(filter-out %_test.go,$(wildcard $(addsuffix /*.go,$(SWAG_SOURCE_DIRS))))
 SWAG_DEST_DIR     := ./pkg/api/docs
 
@@ -59,7 +60,7 @@ all: help
 .PHONY: run docker-run
 .NOTPARALLEL: run docker-run
 
-run: generate lint test build db-up migrate-up ## run server (local)
+run: generate lint test build db-up redis-up migrate-up ## run server (local)
 	$(BIN_DIR)/server
 
 docker-run: generate docker-build docker-up ## run server in docker
@@ -90,7 +91,7 @@ docker-down-volumes: ## stop docker and remove volumes
 docker-logs: ## show docker logs
 	$(DOCKER_COMPOSE) logs -f
 
-docker-db-up:
+docker-db-up: ## start database container
 	$(DOCKER_COMPOSE) up -d $(DB_SERVICE)
 
 docker-db-down: ## stop database container
@@ -100,7 +101,14 @@ docker-db-down-volumes: ## stop database and remove volumes
 	$(DOCKER_COMPOSE) down -v $(DB_SERVICE)
 
 docker-db-shell: ## open psql in db container
-	$(DOCKER_COMPOSE) exec $(DB_SERVICE) sh -c 'mariadb -u $$MYSQL_USER -p$$MYSQL_PASSWORD $$MYSQL_DB'
+	$(DOCKER_COMPOSE) exec $(DB_SERVICE) sh -c 'mariadb -u $$MYSQL_USER -p$$MYSQL_PASSWORD $$MYSQL_DATABASE'
+
+docker-redis-up: ## start redis container
+	$(DOCKER_COMPOSE) up -d $(REDIS_SERVICE)
+
+docker-redis-down: ## stop redis container
+	$(DOCKER_COMPOSE) down $(REDIS_SERVICE)
+
 
 # ============================================
 # DEVELOPMENT COMMANDS (local)
@@ -124,10 +132,13 @@ check-goose: ## install goose if need
 check-swag: ## install swag if need
 	@which swag 2>/dev/null || go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
+check-enumer: ## install enumer if need
+	@which enumer 2>/dev/null || go install https://github.com/dmarkham/enumer@v1.6.3
+
 check-golangci-lint: ## install golangci-lint if need
 	@which golangci-lint 2>/dev/null || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 
-check-tools: check-goose check-swag check-golangci-lint ## check all tools
+check-tools: check-goose check-swag check-enumer check-golangci-lint ## check all tools
 
 
 # Находим все поддиректории в cmd, которые потенциально могут быть бинарниками
@@ -156,7 +167,7 @@ go-generate:
 generate: go-generate swag-generate ## generate all
 
 lint: ## run linters
-	$(LINT) run ./...
+	$(LINTER) run ./...
 
 test: ## run tests
 	go test ./internal/...
@@ -186,6 +197,15 @@ db-down: docker-db-down ## alias for docker-db-down
 db-down-volumes: docker-db-down-volumes ## alias for docker-db-down-volumes
 
 db-shell: docker-db-shell ## alias for docker-db-shell
+
+# ============================================
+# REDIS (local)
+# ============================================
+
+redis-up: docker-redis-up ## alias for docker-redis-up
+
+redis-down: docker-redis-down ## alias for dosker-redis-down
+
 
 # ============================================
 # MIGRATIONS (local)

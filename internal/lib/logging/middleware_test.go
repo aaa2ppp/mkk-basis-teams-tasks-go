@@ -64,7 +64,7 @@ func TestHTTPLogging(t *testing.T) {
 		h := &logHandlerMock{}
 		log := slog.New(h)
 
-		handler := HTTPLogging(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := Middleware(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 		}))
@@ -97,7 +97,7 @@ func TestHTTPLogging(t *testing.T) {
 		h := &logHandlerMock{}
 		log := slog.New(h)
 
-		handler := HTTPLogging(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := Middleware(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			panic("something went wrong")
 		}))
 
@@ -131,7 +131,7 @@ func TestHTTPLogging(t *testing.T) {
 
 		failingWriter := &failingResponseWriter{httptest.NewRecorder()}
 
-		handler := HTTPLogging(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := Middleware(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK")) // вернёт ошибку
 		}))
@@ -154,8 +154,8 @@ func TestHTTPLogging(t *testing.T) {
 		h := &logHandlerMock{}
 		log := slog.New(h)
 
-		handler := HTTPLogging(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			l := FromContext(r.Context())
+		handler := Middleware(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l := GetLogger(r.Context())
 			l.Info("inside handler")
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -181,7 +181,7 @@ func TestHTTPLogging(t *testing.T) {
 		h := &logHandlerMock{}
 		log := slog.New(h)
 
-		handler := HTTPLogging(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := Middleware(log, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("OK")) // WriteHeader не вызван — status должен быть 200
 		}))
 

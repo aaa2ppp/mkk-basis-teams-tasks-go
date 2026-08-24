@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 )
 
 // Nullable allows you to distinguish the absence of a field in the incoming JSON from the null value.
@@ -14,6 +15,13 @@ import (
 type Nullable[T any] struct {
 	sql.Null[T] `json:"-"`
 	Defined     bool `json:"-"`
+}
+
+func (n Nullable[T]) String() string {
+	if !n.Valid {
+		return "<nil>"
+	}
+	return fmt.Sprint(n.V)
 }
 
 // MarshalJSON implements [json.Marshaler].

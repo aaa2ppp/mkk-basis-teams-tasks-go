@@ -1,9 +1,641 @@
-basePath: /api
+basePath: /api/v1
+definitions:
+  model.Change:
+    properties:
+      new: {}
+      old: {}
+    type: object
+  model.Task:
+    properties:
+      assignee_id:
+        type: integer
+      closed_at:
+        format: date-time
+        type: string
+      comments:
+        items:
+          $ref: '#/definitions/model.TaskComment'
+        type: array
+      created_at:
+        format: date-time
+        type: string
+      created_by:
+        type: integer
+      description:
+        type: string
+      history:
+        items:
+          $ref: '#/definitions/model.TaskHistoryEvent'
+        type: array
+      id:
+        type: integer
+      status:
+        enum:
+        - todo
+        - in_progress
+        - done
+        - cancelled
+        type: string
+      team_id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        format: date-time
+        type: string
+      version:
+        type: integer
+    type: object
+  model.TaskComment:
+    properties:
+      content:
+        type: string
+      created_at:
+        format: date-time
+        type: string
+      id:
+        type: integer
+      task_id:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  model.TaskHistoryEvent:
+    properties:
+      changed_by:
+        type: integer
+      changes:
+        additionalProperties:
+          $ref: '#/definitions/model.Change'
+        type: object
+      created_at:
+        format: date-time
+        type: string
+      id:
+        type: integer
+      task_id:
+        type: integer
+    type: object
+  model.Team:
+    properties:
+      created_at:
+        format: date-time
+        type: string
+      created_by:
+        type: integer
+      id:
+        type: integer
+      members:
+        items:
+          $ref: '#/definitions/model.TeamMember'
+        type: array
+      name:
+        type: string
+      tasks:
+        items:
+          $ref: '#/definitions/model.Task'
+        type: array
+    type: object
+  model.TeamMember:
+    properties:
+      role:
+        type: string
+      team_id:
+        type: integer
+      user:
+        $ref: '#/definitions/model.User'
+    type: object
+  model.User:
+    properties:
+      created_at:
+        format: date-time
+        type: string
+      email:
+        format: email
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      team_roles:
+        additionalProperties:
+          type: string
+        example:
+          "123": member
+        type: object
+    type: object
+  sign.LoginReq:
+    properties:
+      email:
+        format: email
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  sign.LoginResp:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/model.User'
+    type: object
+  sign.RegisterReq:
+    properties:
+      email:
+        format: email
+        type: string
+      name:
+        type: string
+      password:
+        example: paS$w0rd
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  tasks.apiAddCommentReq:
+    properties:
+      content:
+        type: string
+    required:
+    - content
+    type: object
+  tasks.apiCreateReq:
+    properties:
+      assignee_id:
+        minimum: 1
+        type: integer
+      description:
+        type: string
+      status:
+        default: todo
+        enum:
+        - todo
+        - in_progress
+        - done
+        - cancelled
+        type: string
+      team_id:
+        minimum: 1
+        type: integer
+      title:
+        type: string
+    required:
+    - status
+    - team_id
+    - title
+    type: object
+  tasks.apiUpdateReq:
+    properties:
+      assignee_id:
+        minimum: 1
+        type: integer
+      description:
+        type: string
+      status:
+        enum:
+        - todo
+        - in_progress
+        - done
+        - cancelled
+        type: string
+      title:
+        type: string
+      version:
+        type: integer
+    required:
+    - status
+    - title
+    - version
+    type: object
+  teams.Metric:
+    properties:
+      detail:
+        type: string
+      type:
+        type: string
+      value:
+        type: number
+    type: object
+  teams.apiCreateReq:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  teams.apiInviteReq:
+    properties:
+      member_role:
+        default: member
+        enum:
+        - admin
+        - member
+        type: string
+      user_email:
+        format: email
+        type: string
+      user_id:
+        minimum: 1
+        type: integer
+    type: object
 info:
   contact: {}
   license:
     name: Apache 2.0
   title: Сервис для управления задачами внутри команд
   version: "1.0"
-paths: {}
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: LoginReq
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/sign.LoginReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/sign.LoginResp'
+        "401":
+          description: Unauthorized
+      summary: Аутентификация пользователя
+      tags:
+      - sign
+  /register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: RegisterReq
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/sign.RegisterReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/sign.LoginResp'
+        "400":
+          description: Bad Request
+      summary: Регистрация пользователя
+      tags:
+      - sign
+  /tasks:
+    get:
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: query
+        minimum: 1
+        name: team_id
+        required: true
+        type: integer
+        x-example: "1"
+      - description: ' '
+        enum:
+        - todo
+        - in_progress
+        - done
+        - cancelled
+        in: query
+        name: status
+        type: string
+      - description: If assignee_id is specified, it must be positive integer or null.
+        in: query
+        name: assignee_id
+        type: string
+        x-example: "5"
+      - default: false
+        description: ' '
+        in: query
+        name: with_comments
+        type: boolean
+      - default: false
+        description: ' '
+        in: query
+        name: with_history
+        type: boolean
+      - default: 20
+        description: ' '
+        in: query
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: ' '
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Task'
+            type: array
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+      summary: Список задач
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/tasks.apiCreateReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Task'
+        "400":
+          description: Bad Request
+      summary: Создание задачи
+      tags:
+      - tasks
+  /tasks/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+        x-example: "5"
+      - description: ' '
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/tasks.apiUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Task'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/model.Task'
+      summary: Обновление задачи
+      tags:
+      - tasks
+  /tasks/{id}/comments:
+    get:
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+        x-example: "5"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Task'
+        "400":
+          description: Bad Request
+      summary: Список комментариев задачи
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+        x-example: "5"
+      - description: ' '
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/tasks.apiAddCommentReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.TaskComment'
+        "400":
+          description: Bad Request
+      summary: Добавление комментария к задаче
+      tags:
+      - tasks
+  /tasks/{id}/history:
+    get:
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+        x-example: "5"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Task'
+        "400":
+          description: Bad Request
+      summary: История изменений задачи
+      tags:
+      - tasks
+  /teams:
+    get:
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - default: false
+        description: ' '
+        in: query
+        name: with_members
+        type: boolean
+      - default: false
+        description: ' '
+        in: query
+        name: with_tasks
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Team'
+            type: array
+        "400":
+          description: Bad Request
+      summary: Список команд
+      tags:
+      - teams
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/teams.apiCreateReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.Team'
+        "400":
+          description: Bad Request
+      summary: Cоздание команды
+      tags:
+      - teams
+  /teams/{id}/invite:
+    post:
+      consumes:
+      - application/json
+      description: 'One of the parameters must be specified: `user_id` or `user_email`.'
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+        x-example: "42"
+      - description: ' '
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/teams.apiInviteReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+      summary: Добавление пользователя в команду
+      tags:
+      - teams
+  /teams/{id}/stats:
+    get:
+      parameters:
+      - description: ' '
+        in: header
+        name: X-Authtoken
+        required: true
+        type: string
+      - description: ' '
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+        x-example: "42"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/teams.Metric'
+            type: array
+        "400":
+          description: Bad Request
+      summary: Отчет по конкретной команде
+      tags:
+      - teams
 swagger: "2.0"
