@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	database "aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/model"
 
@@ -22,9 +21,8 @@ func TestTaskUpdate(t *testing.T) {
 
 	// Хранилище, транзактор, сервис (кеш — заглушка)
 	taskStorage := tasks.NewStorage(db)
-	transactor := database.NewTransactor(db)
 	cache := &NoopCache{}
-	taskService := tasks.NewService(taskStorage, transactor, cache)
+	taskService := tasks.NewService(taskStorage, db, cache)
 
 	// Тестовые данные
 	userOwner := InsertUser(t, db, "owner@test.com", "Owner", "hash")

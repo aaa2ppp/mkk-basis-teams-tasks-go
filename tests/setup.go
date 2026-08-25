@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	database "aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
@@ -44,7 +45,7 @@ func Undef[T any]() model.Nullable[T] {
 
 // StartTestDatabase поднимает контейнер MariaDB, применяет миграции и возвращает *sql.DB
 // и функцию для остановки/очистки.
-func StartTestDatabase(t *testing.T) (*sql.DB, func()) {
+func StartTestDatabase(t *testing.T) (*database.DB, func()) {
 	ctx := context.Background()
 	containerLogger := log.New(io.Discard, "", 0)
 
@@ -72,25 +73,29 @@ func StartTestDatabase(t *testing.T) (*sql.DB, func()) {
 	port, err := container.MappedPort(ctx, "3306/tcp")
 	be.Err(t, err, nil)
 
-	dsn := fmt.Sprintf("testuser:testpass@tcp(%s:%s)/testdb?parseTime=true", host, port.Port())
-	sqlDB, err := sql.Open("mysql", dsn)
+	db, err := database.Open(ctx, database.Config{
+		Addr:     fmt.Sprintf("%s:%s", host, port.Port()),
+		DBName:   "testdb",
+		User:     "testuser",
+		Password: "testpass",
+	})
 	be.Err(t, err, nil)
 
 	// Миграции
 	be.Err(t, goose.SetDialect("mysql"), nil)
-	be.Err(t, goose.Up(sqlDB, "../migrations"), nil)
+	be.Err(t, goose.Up(db.DB(), "../migrations"), nil)
 
 	cleanup := func() {
-		sqlDB.Close()
+		db.Close()
 		container.Terminate(ctx)
 	}
 
-	return sqlDB, cleanup
+	return db, cleanup
 }
 
 // ---- Вспомогательные функции для вставки данных ----
 
-func InsertUser(t *testing.T, db *sql.DB, email, name, pass string) model.UserID {
+func InsertUser(t *testing.T, db *database.DB, email, name, pass string) model.UserID {
 	t.Helper()
 	ctx := context.Background()
 	res, err := db.ExecContext(ctx,
@@ -101,7 +106,7 @@ func InsertUser(t *testing.T, db *sql.DB, email, name, pass string) model.UserID
 	return model.UserID(id)
 }
 
-func InsertTeam(t *testing.T, db *sql.DB, name string, createdBy model.UserID) model.TeamID {
+func InsertTeam(t *testing.T, db *database.DB, name string, createdBy model.UserID) model.TeamID {
 	t.Helper()
 	ctx := context.Background()
 	res, err := db.ExecContext(ctx,
@@ -112,7 +117,7 @@ func InsertTeam(t *testing.T, db *sql.DB, name string, createdBy model.UserID) m
 	return model.TeamID(id)
 }
 
-func AddMember(t *testing.T, db *sql.DB, teamID model.TeamID, userID model.UserID, role model.Role) {
+func AddMember(t *testing.T, db *database.DB, teamID model.TeamID, userID model.UserID, role model.Role) {
 	t.Helper()
 	ctx := context.Background()
 	_, err := db.ExecContext(ctx,
@@ -121,7 +126,7 @@ func AddMember(t *testing.T, db *sql.DB, teamID model.TeamID, userID model.UserI
 	be.Err(t, err, nil)
 }
 
-func CreateTask(t *testing.T, db *sql.DB, teamID model.TeamID, title, desc string,
+func CreateTask(t *testing.T, db *database.DB, teamID model.TeamID, title, desc string,
 	status model.Status, createdBy, assignee *model.UserID, createdAt, closedAt *time.Time) model.TaskID {
 	t.Helper()
 	ctx := context.Background()
@@ -134,7 +139,7 @@ func CreateTask(t *testing.T, db *sql.DB, teamID model.TeamID, title, desc strin
 	return model.TaskID(id)
 }
 
-func AddComment(t *testing.T, db *sql.DB, taskID model.TaskID, userID model.UserID,
+func AddComment(t *testing.T, db *database.DB, taskID model.TaskID, userID model.UserID,
 	content string, createdAt *time.Time) {
 	t.Helper()
 	ctx := context.Background()

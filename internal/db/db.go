@@ -17,7 +17,11 @@ type Config struct {
 	SSLMode  string
 }
 
-func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
+type DB struct {
+	sqlDB *sql.DB
+}
+
+func Open(ctx context.Context, cfg Config) (*DB, error) {
 	host, port, _ := strings.Cut(cfg.Addr, ":")
 	if host == "" {
 		host = "localhost"
@@ -34,7 +38,25 @@ func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
 		return nil, err
 	}
 
-	return db, nil
+	return &DB{db}, nil
+}
+
+func (db *DB) DB() *sql.DB { return db.sqlDB }
+
+func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return db.sqlDB.ExecContext(ctx, query, args...)
+}
+
+func (db *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return db.sqlDB.QueryContext(ctx, query, args...)
+}
+
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return db.sqlDB.QueryRowContext(ctx, query, args...)
+}
+
+func (db *DB) Close() error {
+	return db.sqlDB.Close()
 }
 
 type DBTX interface {
@@ -43,13 +65,8 @@ type DBTX interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-type Transactor sql.DB
-
-func NewTransactor(db *sql.DB) *Transactor { return (*Transactor)(db) }
-
-func (t *Transactor) InTx(ctx context.Context, fn func(ctx context.Context, tx DBTX) error) error {
-	db := (*sql.DB)(t)
-	tx, err := db.BeginTx(ctx, nil)
+func (db *DB) InTx(ctx context.Context, fn func(ctx context.Context, tx DBTX) error) error {
+	tx, err := db.sqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

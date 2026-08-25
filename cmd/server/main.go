@@ -66,7 +66,6 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	defer func() {
 		err = errors.Join(err, db.Close())
 	}()
-	transactor := database.NewTransactor(db)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,
@@ -81,7 +80,7 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	signAPI := sign.NewAPI(
 		sign.NewService(
 			sign.NewStorage(db),
-			transactor,
+			db,
 			tokens,
 		),
 	)
@@ -89,7 +88,7 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 		teams.NewAPI(
 			teams.NewService(
 				teams.NewStorage(db),
-				transactor,
+				db,
 			),
 		),
 	)
@@ -97,7 +96,7 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 		tasks.NewAPI(
 			tasks.NewService(
 				tasks.NewStorage(db),
-				transactor,
+				db,
 				tasks.NewCache(rdb, 5*time.Minute),
 			),
 		),
