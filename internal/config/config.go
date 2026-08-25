@@ -21,6 +21,7 @@ type Server struct {
 	WriteTimeout    time.Duration
 	ShutdownTimeout time.Duration
 	RequestTimeout  time.Duration
+	RateLimit       int
 }
 
 type Redis struct {
@@ -63,6 +64,7 @@ func Load() (Config, error) {
 			WriteTimeout:    gv.Duration("SERVER_WRITE_TIMEOUT", optional, 5*time.Second),
 			RequestTimeout:  gv.Duration("SERVER_REQUEST_TIMEOUT", optional, 5*time.Second),
 			ShutdownTimeout: gv.Duration("SERVER_SHUTDOWN_TIMEOUT", optional, 10*time.Second),
+			RateLimit:       gv.Int("SERVER_RATE_LIMIT", optional, 30),
 		},
 		Auth: Auth{
 			Secret:        gv.String("AUTH_SECRET", required, ""),

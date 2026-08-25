@@ -10,6 +10,7 @@ require (
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.6
+	github.com/ulule/limiter/v3 v3.11.2
 	golang.org/x/crypto v0.55.0
 )
 
@@ -24,6 +25,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/swaggo/files/v2 v2.0.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect

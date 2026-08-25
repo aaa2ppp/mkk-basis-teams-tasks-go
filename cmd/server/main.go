@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,6 +23,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+	"github.com/ulule/limiter/v3"
+	limiterLib "github.com/ulule/limiter/v3/drivers/middleware/stdlib"
+	limiterRedis "github.com/ulule/limiter/v3/drivers/store/redis"
 )
 
 // main godoc
@@ -47,6 +51,11 @@ func main() {
 	slog.Info("server shutdown successfully")
 }
 
+const (
+	rdbCacheDB   = 0
+	rdbLimiterDB = 1
+)
+
 func run(ctx context.Context, cfg config.Config) (err error) {
 	logger := logging.New(cfg.Log)
 
@@ -57,12 +66,12 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	defer func() {
 		err = errors.Join(err, db.Close())
 	}()
-	tansactor := database.NewTransactor(db)
+	transactor := database.NewTransactor(db)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,
-		DB:       0, // use default DB
+		DB:       rdbCacheDB,
 	})
 	defer rdb.Close() //nolint:errcheck
 
@@ -72,7 +81,7 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	signAPI := sign.NewAPI(
 		sign.NewService(
 			sign.NewStorage(db),
-			tansactor,
+			transactor,
 			tokens,
 		),
 	)
@@ -80,7 +89,7 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 		teams.NewAPI(
 			teams.NewService(
 				teams.NewStorage(db),
-				tansactor,
+				transactor,
 			),
 		),
 	)
@@ -88,7 +97,7 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 		tasks.NewAPI(
 			tasks.NewService(
 				tasks.NewStorage(db),
-				tansactor,
+				transactor,
 				tasks.NewCache(rdb, 5*time.Minute),
 			),
 		),
@@ -102,8 +111,34 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	swagger := httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))
 	router.Handle("/swagger/", swagger)
 
+	var handler http.Handler = router
+
+	if cfg.Server.RateLimit > 0 {
+		rdbLimiter := redis.NewClient(&redis.Options{
+			Addr:     cfg.Redis.Addr,
+			Password: cfg.Redis.Password,
+			DB:       rdbLimiterDB,
+		})
+		defer rdbLimiter.Close() //nolint:errcheck
+
+		rate := limiter.Rate{
+			Period: 1 * time.Second,
+			Limit:  int64(cfg.Server.RateLimit),
+		}
+		store, err := limiterRedis.NewStore(rdbLimiter)
+		if err != nil {
+			return fmt.Errorf("rate limiter store: %w", err)
+		}
+		limiterInst := limiter.New(store, rate)
+
+		handler = limiterLib.NewMiddleware(limiterInst).Handler(handler)
+	}
+
+	handler = logging.Middleware(logger, handler)
+	handler = requestTimeout(cfg.Server.RequestTimeout, handler)
+
 	server := http.Server{
-		Handler:      requestTimeout(cfg.Server.RequestTimeout, logging.Middleware(logger, router)),
+		Handler:      handler,
 		Addr:         cfg.Server.Addr,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
