@@ -91,10 +91,17 @@ make init-workspace
 make test-integration
 ```
 
-> При ручном запуске укажите тэг `test`
+При ручном запуске укажите тег `test`
 
 ```sh
 go test -tags=test -v ./tests/...
+```
+
+**Tip:** Для удобного использования в vscode, добавьте в файл `.vscode/settings.json`
+```json
+{
+    "go.buildTags": "test"
+}
 ```
 
 ## Ограничения, особенности и отступления от ТЗ

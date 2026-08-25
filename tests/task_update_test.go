@@ -1,156 +1,55 @@
-// tests/task_update_test.go
 package tests
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"fmt"
-	"io"
-	"log"
 	"testing"
+	"time"
 
-	"aaa2ppp/teams-tasks/internal/db"
+	database "aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
-	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/pressly/goose/v3"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
-
-// helpers для создания Nullable
-func Val[T any](v T) model.Nullable[T] {
-	return model.Nullable[T]{
-		Null:    sql.Null[T]{Valid: true, V: v},
-		Defined: true,
-	}
-}
-
-func Null[T any]() model.Nullable[T] {
-	return model.Nullable[T]{
-		Defined: true,
-	}
-}
-
-func Undef[T any]() model.Nullable[T] {
-	return model.Nullable[T]{}
-}
 
 // TestTaskUpdate проверяет права доступа, версионность и историю при обновлении задачи.
 func TestTaskUpdate(t *testing.T) {
 	ctx := context.Background()
-	containerLogger := log.New(io.Discard, "", 0)
+	db, cleanup := StartTestDatabase(t)
+	defer cleanup()
 
-	// 1. Запуск MariaDB
-	req := testcontainers.ContainerRequest{
-		Image:        "mariadb:12.3.2-noble",
-		ExposedPorts: []string{"3306/tcp"},
-		Env: map[string]string{
-			"MYSQL_ROOT_PASSWORD": "testroot",
-			"MYSQL_DATABASE":      "testdb",
-			"MYSQL_USER":          "testuser",
-			"MYSQL_PASSWORD":      "testpass",
-		},
-		WaitingFor: wait.ForLog("ready for connections").WithOccurrence(2),
-	}
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-		Logger:           containerLogger,
-	})
-	be.Err(t, err, nil)
-	defer container.Terminate(ctx)
-
-	host, err := container.Host(ctx)
-	be.Err(t, err, nil)
-	port, err := container.MappedPort(ctx, "3306/tcp")
-	be.Err(t, err, nil)
-
-	dsn := fmt.Sprintf("testuser:testpass@tcp(%s:%s)/testdb?parseTime=true", host, port.Port())
-	sqlDB, err := sql.Open("mysql", dsn)
-	be.Err(t, err, nil)
-	defer sqlDB.Close()
-
-	// 2. Миграции
-	be.Err(t, goose.SetDialect("mysql"), nil)
-	be.Err(t, goose.Up(sqlDB, "../migrations"), nil)
-
-	// 3. Хранилище, транзактор, сервис (кеш — заглушка)
-	taskStorage := tasks.NewStorage(sqlDB)
-	transactor := db.NewTransactor(sqlDB)
-	cache := &noopCache{}
+	// Хранилище, транзактор, сервис (кеш — заглушка)
+	taskStorage := tasks.NewStorage(db)
+	transactor := database.NewTransactor(db)
+	cache := &NoopCache{}
 	taskService := tasks.NewService(taskStorage, transactor, cache)
 
-	// 4. Тестовые данные
-	insertUser := func(email, name, pass string) (model.UserID, error) {
-		res, err := sqlDB.ExecContext(ctx,
-			"INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)",
-			email, name, pass)
-		if err != nil {
-			return 0, err
-		}
-		id, _ := res.LastInsertId()
-		return model.UserID(id), nil
-	}
+	// Тестовые данные
+	userOwner := InsertUser(t, db, "owner@test.com", "Owner", "hash")
+	userAdmin := InsertUser(t, db, "admin@test.com", "Admin", "hash")
+	userCreator := InsertUser(t, db, "creator@test.com", "Creator", "hash")
+	userOther1 := InsertUser(t, db, "other1@test.com", "Other1", "hash")
+	userOther2 := InsertUser(t, db, "other2@test.com", "Other2", "hash")
+	userOutside := InsertUser(t, db, "outside@test.com", "Outside", "hash")
 
-	userOwner, err := insertUser("owner@test.com", "Owner", "hash")
-	be.Err(t, err, nil)
-	userAdmin, err := insertUser("admin@test.com", "Admin", "hash")
-	be.Err(t, err, nil)
-	userCreator, err := insertUser("creator@test.com", "Creator", "hash")
-	be.Err(t, err, nil)
-	userOther1, err := insertUser("other1@test.com", "Other1", "hash")
-	be.Err(t, err, nil)
-	userOther2, err := insertUser("other2@test.com", "Other2", "hash")
-	be.Err(t, err, nil)
-	userOutside, err := insertUser("outside@test.com", "Outside", "hash")
-	be.Err(t, err, nil)
+	teamID := InsertTeam(t, db, "Test Team", userOwner)
+	AddMember(t, db, teamID, userOwner, model.RoleOwner)
+	AddMember(t, db, teamID, userAdmin, model.RoleAdmin)
+	AddMember(t, db, teamID, userCreator, model.RoleMember)
+	AddMember(t, db, teamID, userOther1, model.RoleMember)
+	AddMember(t, db, teamID, userOther2, model.RoleMember)
 
-	teamRes, err := sqlDB.ExecContext(ctx,
-		"INSERT INTO teams (name, created_by) VALUES (?, ?)",
-		"Test Team", userOwner)
-	be.Err(t, err, nil)
-	teamID64, _ := teamRes.LastInsertId()
-	teamID := model.TeamID(teamID64)
-
-	addMember := func(teamID model.TeamID, userID model.UserID, role model.Role) error {
-		_, err := sqlDB.ExecContext(ctx,
-			"INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, ?)",
-			teamID, userID, role.String())
-		return err
-	}
-	be.Err(t, addMember(teamID, userOwner, model.RoleOwner), nil)
-	be.Err(t, addMember(teamID, userAdmin, model.RoleAdmin), nil)
-	be.Err(t, addMember(teamID, userCreator, model.RoleMember), nil)
-	be.Err(t, addMember(teamID, userOther1, model.RoleMember), nil)
-	be.Err(t, addMember(teamID, userOther2, model.RoleMember), nil)
-
-	// Создаем задачу (creator = userMember, assignee = userMember)
-	createTask := func(teamID model.TeamID, title, desc string, status model.Status,
-		createdBy, assignee *model.UserID) (model.TaskID, error) {
-		res, err := sqlDB.ExecContext(ctx,
-			`INSERT INTO tasks (team_id, title, description, status, created_by, assignee_id)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			teamID, title, desc, status, createdBy, assignee)
-		if err != nil {
-			return 0, err
-		}
-		id, _ := res.LastInsertId()
-		return model.TaskID(id), nil
-	}
-	taskID, err := createTask(teamID, "Test Task", "Initial desc", model.StatusTodo, &userCreator, nil)
-	be.Err(t, err, nil)
+	now := time.Now()
+	taskID := CreateTask(t, db, teamID, "Test Task", "Initial desc", model.StatusTodo, &userCreator, nil, &now, nil)
 
 	// Текущая версия
 	task, err := taskStorage.GetByID(ctx, tasks.DBGetByIDReq{TaskID: taskID})
 	be.Err(t, err, nil)
 	currentVersion := task.Version
 
-	// 5. Сценарии обновления
+	// Сценарии обновления
 	tests := []struct {
 		name    string
 		userID  model.UserID
@@ -434,19 +333,3 @@ func TestTaskUpdate(t *testing.T) {
 		})
 	}
 }
-
-// --- Заглушки и хелперы ---
-
-type noopCache struct{}
-
-func (c *noopCache) Get(ctx context.Context, key string, val any) error {
-	return model.ErrNotFound
-}
-func (c *noopCache) Put(ctx context.Context, key string, val any) error {
-	return nil
-}
-func (c *noopCache) Invalidate(ctx context.Context, key string) error {
-	return nil
-}
-
-var contextWithUser = auth.ContextWithUserForTest
