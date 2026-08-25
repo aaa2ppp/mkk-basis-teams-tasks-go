@@ -445,6 +445,9 @@ func (s *service) Update(ctx context.Context, req SvcUpdateReq) (model.Task, err
 		})
 		return
 	}); err != nil {
+		if errors.Is(err, model.ErrNoRowsAffected) {
+			return zero, model.ErrForbidden
+		}
 		return zero, err
 	}
 

@@ -76,7 +76,7 @@ make clean
 
 Все доступные команды `make` можно посмотреть, выполнив:
 
-```bash
+```sh
 make help
 ```
 
@@ -86,9 +86,15 @@ make help
 
 Для их локального запуска необходимо предварительно инициализировать Go workspace:
 
-```bash
+```sh
 make init-workspace
 make test-integration
+```
+
+> При ручном запуске укажите тэг `test`
+
+```sh
+go test -tags=test -v ./tests/...
 ```
 
 ## Ограничения, особенности и отступления от ТЗ
