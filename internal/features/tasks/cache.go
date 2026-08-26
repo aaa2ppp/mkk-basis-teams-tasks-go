@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,21 +37,35 @@ func (c cache) Get(ctx context.Context, key string, val any) error {
 }
 
 func (c cache) Put(ctx context.Context, key string, val any) error {
-	data, _ := json.Marshal(val)
+	data, err := json.Marshal(val)
+	if err != nil {
+		return fmt.Errorf("cache marshal: %w", err)
+	}
 	return c.redis.Set(ctx, key, data, c.ttl).Err()
 }
 
 func (c cache) Invalidate(ctx context.Context, pattern string) error {
-	iter := c.redis.Scan(ctx, 0, pattern, 0).Iterator()
-	var keys []string
-	for iter.Next(ctx) {
-		keys = append(keys, iter.Val())
+	if pattern == "" || pattern == "*" {
+		return errors.New("refusing to invalidate all keys")
 	}
-	if err := iter.Err(); err != nil {
-		return err
+
+	const batchSize = 100
+	var cursor uint64
+
+	for {
+		keys, nextCursor, err := c.redis.Scan(ctx, cursor, pattern, batchSize).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := c.redis.Unlink(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
 	}
-	if len(keys) == 0 {
-		return nil
-	}
-	return c.redis.Unlink(ctx, keys...).Err()
+	return nil
 }
