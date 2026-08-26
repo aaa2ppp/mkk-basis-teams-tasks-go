@@ -27,7 +27,6 @@ type Server struct {
 type Redis struct {
 	Addr     string
 	Password string
-	DB       int
 	Timeout  time.Duration
 }
 
@@ -74,7 +73,6 @@ func Load() (Config, error) {
 		Redis: Redis{
 			Addr:     gv.String("REDIS_ADDR", required, ""),
 			Password: gv.String("REDIS_PASSWORD", required, ""),
-			DB:       gv.Int("REDIS_DB", optional, 0),
 			Timeout:  gv.Duration("REDIS_TIMEOUT", optional, 5*time.Second),
 		},
 	}
