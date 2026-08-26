@@ -39,7 +39,7 @@ func (b *breaker) Get(ctx context.Context, req SvcGetReq) (resp model.Task, err 
 }
 
 // List implements [Service].
-func (b *breaker) List(ctx context.Context, req SvcListReq) (resp []model.Task, err error) {
+func (b *breaker) List(ctx context.Context, req SvcListReq) (resp SvcListResp, err error) {
 	err = b.cb.Execute(func() error {
 		resp, err = b.svc.List(ctx, req)
 		return err

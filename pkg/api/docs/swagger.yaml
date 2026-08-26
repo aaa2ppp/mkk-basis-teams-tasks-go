@@ -156,6 +156,15 @@ definitions:
     - email
     - password
     type: object
+  tasks.SvcListResp:
+    properties:
+      next_cursor:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/model.Task'
+        type: array
+    type: object
   tasks.apiAddCommentReq:
     properties:
       content:
@@ -338,11 +347,10 @@ paths:
         minimum: 1
         name: limit
         type: integer
-      - default: 0
-        description: ' '
+      - description: ' '
         in: query
-        minimum: 0
-        name: offset
+        minimum: 1
+        name: cursor
         type: integer
       produces:
       - application/json
@@ -350,9 +358,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/model.Task'
-            type: array
+            $ref: '#/definitions/tasks.SvcListResp'
         "400":
           description: Bad Request
         "401":

@@ -31,8 +31,8 @@ type DBListReq struct {
 	TeamID     model.TeamID
 	Status     model.Status
 	AssigneeID Nullable[model.UserID]
-	Limit      int64
-	Offset     int64
+	Cursor     model.TaskID
+	Limit      int
 	CurUserID  model.UserID
 }
 
@@ -128,7 +128,12 @@ func buildTasksKey(req SvcListReq) string {
 	if req.AssigneeID.Defined {
 		fmt.Fprintf(&kb, ":assignee:%v", req.AssigneeID)
 	}
-	fmt.Fprintf(&kb, ":limit:%d:offset:%d", req.Limit, req.Offset)
+	if req.Cursor != 0 {
+		fmt.Fprintf(&kb, ":cursor:%d", req.Cursor)
+	}
+	if req.Limit != 0 {
+		fmt.Fprintf(&kb, ":limit:%d", req.Limit)
+	}
 	return kb.String()
 }
 
@@ -250,14 +255,16 @@ func (s *service) Get(ctx context.Context, req SvcGetReq) (model.Task, error) {
 	return task, nil
 }
 
-func (s *service) List(ctx context.Context, req SvcListReq) ([]model.Task, error) {
+func (s *service) List(ctx context.Context, req SvcListReq) (SvcListResp, error) {
+	var zero SvcListResp
+
 	curUser, err := auth.GetCurrentUser(ctx)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	if req.TeamID != 0 && curUser.TeamRoles[req.TeamID.String()] == 0 {
-		return nil, model.ErrForbidden
+		return zero, model.ErrForbidden
 	}
 
 	tasks, err := getOrLoadTasks(ctx, req, s.cache, func() ([]model.Task, error) {
@@ -265,17 +272,28 @@ func (s *service) List(ctx context.Context, req SvcListReq) ([]model.Task, error
 			TeamID:     req.TeamID,
 			Status:     req.Status,
 			AssigneeID: req.AssigneeID,
-			Limit:      req.Limit,
-			Offset:     req.Offset,
+			Cursor:     req.Cursor,
+			Limit:      req.Limit + 1,
 			CurUserID:  curUser.ID,
 		})
 	})
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
-	if len(tasks) == 0 || (!req.WithComments && !req.WithHistory) {
-		return tasks, nil
+	if len(tasks) == 0 {
+		return zero, nil
+	}
+
+	resp := zero
+	if len(tasks) > req.Limit {
+		resp.NextCursor = tasks[req.Limit].ID
+		tasks = tasks[:req.Limit]
+	}
+	resp.Tasks = tasks
+
+	if !req.WithComments && !req.WithHistory {
+		return resp, nil
 	}
 
 	tasksIDs := make([]model.TaskID, 0, len(tasks))
@@ -286,7 +304,7 @@ func (s *service) List(ctx context.Context, req SvcListReq) ([]model.Task, error
 	if req.WithComments {
 		comments, err := s.storage.GetComments(ctx, tasksIDs)
 		if err != nil {
-			return nil, err
+			return zero, err
 		}
 		collectComments(tasks, comments)
 	}
@@ -294,12 +312,12 @@ func (s *service) List(ctx context.Context, req SvcListReq) ([]model.Task, error
 	if req.WithHistory {
 		history, err := s.storage.GetHistory(ctx, tasksIDs)
 		if err != nil {
-			return nil, err
+			return zero, err
 		}
 		collectHistory(tasks, history)
 	}
 
-	return tasks, nil
+	return resp, nil
 }
 
 func collectComments(tasks []model.Task, comments []model.TaskComment) {

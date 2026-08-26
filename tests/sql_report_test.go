@@ -51,19 +51,19 @@ func TestSQLReport(t *testing.T) {
 
 	// Задачи:
 	// 1: done, assignee=admin, закрыта 10 дней назад
-	CreateTask(t, db, teamID, "Task 1", "desc1", model.StatusDone, &userOwnerID, &userAdminID, &tenDaysAgo, &tenDaysAgo)
+	CreateTask(t, db, teamID, "Task 1", "desc1", model.StatusDone, userOwnerID, &userAdminID, tenDaysAgo, &tenDaysAgo)
 	// 2: done, assignee=member, закрыта 20 дней назад
-	CreateTask(t, db, teamID, "Task 2", "desc2", model.StatusDone, &userOwnerID, &userMemberID, &twentyDaysAgo, &twentyDaysAgo)
+	CreateTask(t, db, teamID, "Task 2", "desc2", model.StatusDone, userOwnerID, &userMemberID, twentyDaysAgo, &twentyDaysAgo)
 	// 3: done, assignee=admin, закрыта 5 дней назад
-	CreateTask(t, db, teamID, "Task 3", "desc3", model.StatusDone, &userOwnerID, &userAdminID, &fiveDaysAgo, &fiveDaysAgo)
+	CreateTask(t, db, teamID, "Task 3", "desc3", model.StatusDone, userOwnerID, &userAdminID, fiveDaysAgo, &fiveDaysAgo)
 	// 4: done, assignee=admin, закрыта 31 день назад (не входит в топ за 30 дней)
-	CreateTask(t, db, teamID, "Task 4", "desc4", model.StatusDone, &userOwnerID, &userAdminID, &thirtyOneDaysAgo, &thirtyOneDaysAgo)
+	CreateTask(t, db, teamID, "Task 4", "desc4", model.StatusDone, userOwnerID, &userAdminID, thirtyOneDaysAgo, &thirtyOneDaysAgo)
 	// 5: todo
-	CreateTask(t, db, teamID, "Task 5", "desc5", model.StatusTodo, &userOwnerID, &userMemberID, &now, nil)
+	CreateTask(t, db, teamID, "Task 5", "desc5", model.StatusTodo, userOwnerID, &userMemberID, now, nil)
 	// 6: in_progress
-	CreateTask(t, db, teamID, "Task 6", "desc6", model.StatusInProgress, &userOwnerID, &userAdminID, &now, nil)
+	CreateTask(t, db, teamID, "Task 6", "desc6", model.StatusInProgress, userOwnerID, &userAdminID, now, nil)
 	// 7: done, assignee=owner, закрыта 2 дня назад
-	CreateTask(t, db, teamID, "Task 7", "desc7", model.StatusDone, &userOwnerID, &userOwnerID, &twoDaysAgo, &twoDaysAgo)
+	CreateTask(t, db, teamID, "Task 7", "desc7", model.StatusDone, userOwnerID, &userOwnerID, twoDaysAgo, &twoDaysAgo)
 
 	// Комментарии: к задачам 1,2,3 (по одному), и дополнительный к задаче 1.
 	for i := 1; i <= 3; i++ {

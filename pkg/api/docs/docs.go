@@ -155,11 +155,10 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "minimum": 0,
+                        "minimum": 1,
                         "type": "integer",
-                        "default": 0,
                         "description": " ",
-                        "name": "offset",
+                        "name": "cursor",
                         "in": "query"
                     }
                 ],
@@ -167,10 +166,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.Task"
-                            }
+                            "$ref": "#/definitions/tasks.SvcListResp"
                         }
                     },
                     "400": {
@@ -825,6 +821,20 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "example": "paS$w0rd"
+                }
+            }
+        },
+        "tasks.SvcListResp": {
+            "type": "object",
+            "properties": {
+                "next_cursor": {
+                    "type": "integer"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Task"
+                    }
                 }
             }
         },

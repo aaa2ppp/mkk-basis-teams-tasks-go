@@ -151,6 +151,11 @@ func (s *storage) List(ctx context.Context, req DBListReq) ([]model.Task, error)
 		args = append(args, req.TeamID)
 	}
 
+	if req.Cursor != 0 {
+		qb.WriteString(" AND t.id >= ?")
+		args = append(args, req.Cursor)
+	}
+
 	if req.Status != 0 {
 		qb.WriteString(" AND t.status = ?")
 		args = append(args, req.Status)
@@ -167,9 +172,9 @@ func (s *storage) List(ctx context.Context, req DBListReq) ([]model.Task, error)
 
 	qb.WriteString(`
 		ORDER BY t.id
-		LIMIT ?	OFFSET ?
+		LIMIT ?
 	`)
-	args = append(args, req.Limit, req.Offset)
+	args = append(args, req.Limit)
 
 	query := qb.String()
 	rows, err := s.db.QueryContext(ctx, query, args...)

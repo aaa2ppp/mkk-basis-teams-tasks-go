@@ -40,7 +40,7 @@ func TestTaskUpdate(t *testing.T) {
 	AddMember(t, db, teamID, userOther2, model.RoleMember)
 
 	now := time.Now()
-	taskID := CreateTask(t, db, teamID, "Test Task", "Initial desc", model.StatusTodo, &userCreator, nil, &now, nil)
+	taskID := CreateTask(t, db, teamID, "Test Task", "Initial desc", model.StatusTodo, userCreator, nil, now, nil)
 
 	// Текущая версия
 	task, err := taskStorage.GetByID(ctx, tasks.DBGetByIDReq{TaskID: taskID})

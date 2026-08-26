@@ -35,8 +35,13 @@ type SvcListReq struct {
 	AssigneeID   Nullable[model.UserID]
 	WithComments bool
 	WithHistory  bool
-	Offset       int64
-	Limit        int64
+	Cursor       model.TaskID
+	Limit        int
+}
+
+type SvcListResp struct {
+	Tasks      []model.Task `json:"tasks,omitempty"`
+	NextCursor model.TaskID `json:"next_cursor,omitempty"`
 }
 
 type SvcUpdateReq struct {
@@ -55,7 +60,7 @@ type SvcAddCommentReq struct {
 
 type Service interface {
 	Create(ctx context.Context, req SvcCreateReq) (model.Task, error)
-	List(ctx context.Context, req SvcListReq) ([]model.Task, error)
+	List(ctx context.Context, req SvcListReq) (SvcListResp, error)
 	Update(ctx context.Context, req SvcUpdateReq) (model.Task, error)
 	AddComment(ctx context.Context, req SvcAddCommentReq) (model.TaskComment, error)
 	Get(ctx context.Context, req SvcGetReq) (model.Task, error)
@@ -144,15 +149,15 @@ func (req *apiCreateReq) Validate() error {
 //	@router		/tasks [get]
 //	@summary	Список задач
 //	@produce	json
-//	@param		X-Authtoken		header	string	true	" "
-//	@param		team_id			query	int		true	" "																	minimum(1)	extensions(x-example=1)
-//	@param		status			query	string	false	" "																	enums(todo,in_progress,done,cancelled)
-//	@param		assignee_id		query	string	false	"If assignee_id is specified, it must be positive integer or null."	extensions(x-example=5)
-//	@param		with_comments	query	bool	false	" "																	default(false)
-//	@param		with_history	query	bool	false	" "																	default(false)
-//	@param		limit			query	int		false	" "																	minimum(1)	default(20)
-//	@param		offset			query	int		false	" "																	minimum(0)	default(0)
-//	@success	200				{array}	model.Task
+//	@param		X-Authtoken		header		string	true	" "
+//	@param		team_id			query		int		true	" "																	minimum(1)	extensions(x-example=1)
+//	@param		status			query		string	false	" "																	enums(todo,in_progress,done,cancelled)
+//	@param		assignee_id		query		string	false	"If assignee_id is specified, it must be positive integer or null."	extensions(x-example=5)
+//	@param		with_comments	query		bool	false	" "																	default(false)
+//	@param		with_history	query		bool	false	" "																	default(false)
+//	@param		limit			query		int		false	" "																	minimum(1)	default(20)
+//	@param		cursor			query		int		false	" "																	minimum(1)
+//	@success	200				{object}	SvcListResp
 //	@failure	400
 //	@failure	401
 func list(svc Service) http.HandlerFunc {
@@ -165,17 +170,17 @@ func list(svc Service) http.HandlerFunc {
 			return
 		}
 
-		tasks, err := svc.List(h.Ctx(), req)
+		resp, err := svc.List(h.Ctx(), req)
 		if err != nil {
 			h.WriteError(err)
 			return
 		}
 
-		h.WriteResponse(200, tasks)
+		h.WriteResponse(200, resp)
 	}
 }
 
-// parseListQuery ?team_id=1&status=todo&assignee_id=5&limit=20&offset=0
+// parseListQuery ?team_id=1&status=todo&assignee_id=5&limit=20&cursor=11
 func parseListQuery(q url.Values) (SvcListReq, error) {
 	var req SvcListReq
 	var errs []error
@@ -240,23 +245,24 @@ func parseListQuery(q url.Values) (SvcListReq, error) {
 		}
 	}
 
+	req.Limit = 20
 	if q.Has("limit") {
 		s := q.Get("limit")
-		v, err := strconv.ParseInt(s, 10, 64)
+		v, err := strconv.Atoi(s)
 		if err != nil || v <= 0 {
-			errs = append(errs, errors.New("limit must int > 0"))
+			errs = append(errs, errors.New("limit must be int > 0"))
 		} else {
 			req.Limit = v
 		}
 	}
 
-	if q.Has("offset") {
-		s := q.Get("offset")
-		v, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || v < 0 {
-			errs = append(errs, errors.New("offset must int >= 0"))
+	if q.Has("cursor") {
+		s := q.Get("cursor")
+		v, err := model.ParseID(s)
+		if err != nil || v <= 0 {
+			errs = append(errs, errors.New("cursor must be int > 0"))
 		} else {
-			req.Offset = v
+			req.Cursor = model.TaskID(v)
 		}
 	}
 

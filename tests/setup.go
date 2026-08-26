@@ -127,7 +127,7 @@ func AddMember(t *testing.T, db *database.DB, teamID model.TeamID, userID model.
 }
 
 func CreateTask(t *testing.T, db *database.DB, teamID model.TeamID, title, desc string,
-	status model.Status, createdBy, assignee *model.UserID, createdAt, closedAt *time.Time) model.TaskID {
+	status model.Status, createdBy model.UserID, assignee *model.UserID, createdAt time.Time, closedAt *time.Time) model.TaskID {
 	t.Helper()
 	ctx := context.Background()
 	res, err := db.ExecContext(ctx,

@@ -65,6 +65,3 @@ CREATE TABLE IF NOT EXISTS task_comments (
     CONSTRAINT fk_task_comments_task_id_tasks FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     CONSTRAINT fk_task_comments_user_id_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- +goose Down
-SELECT 'down SQL query';
