@@ -77,6 +77,16 @@ func (gv *GetValue) Int(key string, required bool, defaultValue int) int {
 	return v
 }
 
+func (gv *GetValue) Float(key string, required bool, defaultValue float64) float64 {
+	v, err := getValue(gv.lookup, key, required, defaultValue, func(s string) (float64, error) {
+		return strconv.ParseFloat(s, 64)
+	})
+	if err != nil {
+		gv.errs = append(gv.errs, err)
+	}
+	return v
+}
+
 func (gv *GetValue) LogLevel(key string, required bool, defaultValue slog.Level) slog.Level {
 	v, err := getValue(gv.lookup, key, required, defaultValue, func(s string) (slog.Level, error) {
 		var v slog.Level

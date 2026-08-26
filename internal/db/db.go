@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	Addr     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Addr           string
+	User           string
+	Password       string
+	DBName         string
+	SSLMode        string
+	CircuitBreaker CircuitBreakerConfig
 }
 
 type DB struct {

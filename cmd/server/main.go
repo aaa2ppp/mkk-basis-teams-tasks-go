@@ -58,6 +58,7 @@ const (
 
 func run(ctx context.Context, cfg config.Config) (err error) {
 	logger := logging.New(cfg.Log)
+	tokens := auth.New(cfg.Auth)
 
 	db, err := database.Open(ctx, cfg.DB)
 	if err != nil {
@@ -67,6 +68,8 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 		err = errors.Join(err, db.Close())
 	}()
 
+	cd := database.NewCircuitBreaker(cfg.DB.CircuitBreaker)
+
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,
@@ -74,34 +77,11 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	})
 	defer rdb.Close() //nolint:errcheck
 
+	signAPI := newSignAPI(tokens, db, cd)
+	teamsAPI := newTeamsAPI(tokens, db, cd)
+	tasksAPI := newTasksAPI(tokens, db, cd, rdb)
+
 	router := http.NewServeMux()
-	tokens := auth.New(cfg.Auth)
-
-	signAPI := sign.NewAPI(
-		sign.NewService(
-			sign.NewStorage(db),
-			db,
-			tokens,
-		),
-	)
-	teamsAPI := tokens.Middleware(
-		teams.NewAPI(
-			teams.NewService(
-				teams.NewStorage(db),
-				db,
-			),
-		),
-	)
-	tasksAPI := tokens.Middleware(
-		tasks.NewAPI(
-			tasks.NewService(
-				tasks.NewStorage(db),
-				db,
-				tasks.NewCache(rdb, 5*time.Minute),
-			),
-		),
-	)
-
 	base := strings.TrimRight(docs.SwaggerInfo.BasePath, "/")
 	router.Handle(base+"/", http.StripPrefix(base, signAPI))
 	router.Handle(base+"/teams/", http.StripPrefix(base, teamsAPI))
@@ -159,6 +139,50 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	case err := <-done:
 		return err
 	}
+}
+
+func newSignAPI(tokens *auth.Tokens, db *database.DB, cb *database.CircuitBreaker) http.Handler {
+	return sign.NewAPI(
+		sign.NewBreaker(
+			cb,
+			sign.NewService(
+				sign.NewStorage(db),
+				db,
+				tokens,
+			),
+		),
+	)
+
+}
+
+func newTeamsAPI(tokens *auth.Tokens, db *database.DB, cb *database.CircuitBreaker) http.Handler {
+	return tokens.Middleware(
+		teams.NewAPI(
+			teams.NewBreaker(
+				cb,
+				teams.NewService(
+					teams.NewStorage(db),
+					db,
+				),
+			),
+		),
+	)
+}
+
+func newTasksAPI(tokens *auth.Tokens, db *database.DB, cb *database.CircuitBreaker, rdb *redis.Client) http.Handler {
+	return tokens.Middleware(
+		tasks.NewAPI(
+			tasks.NewBreaker(
+				cb,
+				tasks.NewService(
+					tasks.NewStorage(db),
+					db,
+					tasks.NewCache(rdb, 5*time.Minute),
+				),
+			),
+		),
+	)
+
 }
 
 func requestTimeout(d time.Duration, h http.Handler) http.HandlerFunc {

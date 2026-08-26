@@ -13,6 +13,7 @@ import (
 
 type Log = logging.Config
 type DB = db.Config
+type DBCircuitBreaker = db.CircuitBreakerConfig
 type Auth = auth.Config
 
 type Server struct {
@@ -56,6 +57,14 @@ func Load() (Config, error) {
 			User:     gv.String("DB_USER", optional, "app-user"),
 			Password: gv.String("DB_PASSWORD", required, ""),
 			DBName:   gv.String("DB_NAME", optional, "app-db"),
+			CircuitBreaker: DBCircuitBreaker{
+				WindowInterval: gv.Duration("DB_CB_WINDOW_INTERVAL", optional, 60*time.Second),
+				BucketPeriod:   gv.Duration("DB_CB_BUCKET_PERIOD", optional, 10*time.Second),
+				OpenTimeout:    gv.Duration("DB_CB_OPEN_TIMEOUT", optional, 30*time.Second),
+				HalfOpenMaxReq: gv.Int("DB_CB_HALFOPEN_MAX_REQ", optional, 3),
+				WindowMinReq:   gv.Int("DB_CB_WINDOW_MIN_REQ", optional, 10),
+				FailureRatio:   gv.Float("DB_CB_FAILURE_RATIO", optional, 0.5),
+			},
 		},
 		Server: Server{
 			Addr:            gv.String("SERVER_ADDR", required, ""),
