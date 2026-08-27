@@ -11,6 +11,8 @@ import (
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/lib/logging"
 	"aaa2ppp/teams-tasks/internal/model"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type DBCreateReq struct {
@@ -136,37 +138,63 @@ func buildCacheField(req SvcListReq) string {
 	return kb.String()
 }
 
-func getOrLoadTasks(ctx context.Context, req SvcListReq, cache Cache, fn func() ([]model.Task, error)) ([]model.Task, error) {
-	var tasks []model.Task
+func (s *service) getOrLoadTasks(ctx context.Context, req SvcListReq, fn func() ([]model.Task, error)) ([]model.Task, error) {
+
+	// Используем singleflight даже при наличии кеша, чтобы избежать множественных
+	// сетевых обращений.
+	// Обезличиваем контектс запроса, т.к. он общий для всех в группе.
+	// Не прерываем выполнение singleflight, если запрос отменен - его результат
+	// может пригодиться последующим запросам.
 
 	key := buildCacheKey(req.TeamID)
 	field := buildCacheField(req)
 
-	if err := cache.Get(ctx, key, field, &tasks); err == nil {
-		logging.GetLogger(ctx).Debug("match cache", "key", key, "field", field)
+	ch := s.sf.DoChan(key+":"+field, func() (_ any, err error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	} else {
-		if !errors.Is(err, model.ErrNotFound) {
-			logging.GetLogger(ctx).Warn("get from cache", "error", err, "key", key, "field", field)
+		var tasks []model.Task
+		if err := s.cache.Get(ctx, key, field, &tasks); err == nil {
+			logging.GetLogger(ctx).Debug("match cache", "key", key, "field", field)
+
+		} else {
+			if !errors.Is(err, model.ErrNotFound) {
+				logging.GetLogger(ctx).Warn("get from cache", "error", err, "key", key, "field", field)
+			}
+
+			tasks, err = fn()
+			if err != nil {
+				return nil, err
+			}
+
+			if err := s.cache.Put(ctx, key, field, tasks); err != nil {
+				logging.GetLogger(ctx).Warn("put to cache", "error", err, "key", key, "field", field)
+			}
 		}
 
-		tasks, err = fn()
-		if err != nil {
-			return nil, err
-		}
+		return tasks, nil
+	})
 
-		if err := cache.Put(ctx, key, field, tasks); err != nil {
-			logging.GetLogger(ctx).Warn("put to cache", "error", err, "key", key, "field", field)
-		}
+	var res singleflight.Result
+	select {
+	case res = <-ch:
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 
-	return tasks, nil
+	if err := res.Err; err != nil {
+		return nil, err
+	}
+	return res.Val.([]model.Task), nil
 }
+
+var defaultSF singleflight.Group
 
 type service struct {
 	storage    Storage
 	transactor Transactor
 	cache      Cache
+	sf         *singleflight.Group
 }
 
 var _ Service = &service{}
@@ -176,6 +204,7 @@ func NewService(storage Storage, transactor Transactor, cache Cache) *service {
 		storage:    storage,
 		transactor: transactor,
 		cache:      cache,
+		sf:         &defaultSF,
 	}
 }
 
@@ -267,7 +296,7 @@ func (s *service) List(ctx context.Context, req SvcListReq) (SvcListResp, error)
 		return zero, model.ErrForbidden
 	}
 
-	tasks, err := getOrLoadTasks(ctx, req, s.cache, func() ([]model.Task, error) {
+	tasks, err := s.getOrLoadTasks(ctx, req, func() ([]model.Task, error) {
 		return s.storage.List(ctx, DBListReq{
 			TeamID:     req.TeamID,
 			Status:     req.Status,

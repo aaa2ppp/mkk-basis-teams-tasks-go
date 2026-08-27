@@ -13,6 +13,7 @@ require (
 	github.com/swaggo/swag v1.16.6
 	github.com/ulule/limiter/v3 v3.11.2
 	golang.org/x/crypto v0.55.0
+	golang.org/x/sync v0.7.0
 )
 
 require (
