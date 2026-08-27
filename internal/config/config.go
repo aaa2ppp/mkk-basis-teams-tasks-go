@@ -31,12 +31,17 @@ type Redis struct {
 	Timeout  time.Duration
 }
 
+type Cache struct {
+	TasksTLL time.Duration
+}
+
 type Config struct {
 	Log    Log
 	DB     DB
 	Server Server
 	Auth   Auth
 	Redis  Redis
+	Cache  Cache
 }
 
 const (
@@ -83,6 +88,9 @@ func Load() (Config, error) {
 			Addr:     gv.String("REDIS_ADDR", required, ""),
 			Password: gv.String("REDIS_PASSWORD", required, ""),
 			Timeout:  gv.Duration("REDIS_TIMEOUT", optional, 5*time.Second),
+		},
+		Cache: Cache{
+			TasksTLL: gv.Duration("CACHE_TASKS_TTL", optional, 5*time.Minute),
 		},
 	}
 

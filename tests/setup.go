@@ -153,13 +153,13 @@ func AddComment(t *testing.T, db *database.DB, taskID model.TaskID, userID model
 
 type NoopCache struct{}
 
-func (c *NoopCache) Get(ctx context.Context, key string, val any) error {
+func (c *NoopCache) Get(ctx context.Context, key, field string, val any) error {
 	return model.ErrNotFound
 }
-func (c *NoopCache) Put(ctx context.Context, key string, val any) error {
+func (c *NoopCache) Put(ctx context.Context, key, field string, val any) error {
 	return nil
 }
-func (c *NoopCache) Invalidate(ctx context.Context, key string) error {
+func (c *NoopCache) Del(ctx context.Context, key string) error {
 	return nil
 }
 

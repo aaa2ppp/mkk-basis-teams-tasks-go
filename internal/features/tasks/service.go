@@ -110,18 +110,17 @@ type Transactor interface {
 }
 
 type Cache interface {
-	Get(ctx context.Context, key string, val any) error
-	Put(ctx context.Context, key string, val any) error
-	Invalidate(ctx context.Context, key string) error
+	Get(ctx context.Context, key, field string, val any) error
+	Put(ctx context.Context, key, field string, val any) error
+	Del(ctx context.Context, key string) error
 }
 
-func invalidatePattern(teamID model.TeamID) string {
-	return fmt.Sprintf("tasks:team:%d:*", teamID)
+func buildCacheKey(teamID model.TeamID) string {
+	return fmt.Sprintf("tasks:team:%d", teamID)
 }
 
-func buildTasksKey(req SvcListReq) string {
+func buildCacheField(req SvcListReq) string {
 	var kb strings.Builder
-	fmt.Fprintf(&kb, "tasks:team:%d", req.TeamID)
 	if req.Status != 0 {
 		fmt.Fprintf(&kb, ":status:%v", req.Status)
 	}
@@ -140,14 +139,15 @@ func buildTasksKey(req SvcListReq) string {
 func getOrLoadTasks(ctx context.Context, req SvcListReq, cache Cache, fn func() ([]model.Task, error)) ([]model.Task, error) {
 	var tasks []model.Task
 
-	key := buildTasksKey(req)
+	key := buildCacheKey(req.TeamID)
+	field := buildCacheField(req)
 
-	if err := cache.Get(ctx, key, &tasks); err == nil {
-		logging.GetLogger(ctx).Debug("match cache", "key", key)
+	if err := cache.Get(ctx, key, field, &tasks); err == nil {
+		logging.GetLogger(ctx).Debug("match cache", "key", key, "field", field)
 
 	} else {
 		if !errors.Is(err, model.ErrNotFound) {
-			logging.GetLogger(ctx).Warn("get from cache", "error", err)
+			logging.GetLogger(ctx).Warn("get from cache", "error", err, "key", key, "field", field)
 		}
 
 		tasks, err = fn()
@@ -155,8 +155,8 @@ func getOrLoadTasks(ctx context.Context, req SvcListReq, cache Cache, fn func() 
 			return nil, err
 		}
 
-		if err := cache.Put(ctx, key, tasks); err != nil {
-			logging.GetLogger(ctx).Warn("put to cache", "error", err)
+		if err := cache.Put(ctx, key, field, tasks); err != nil {
+			logging.GetLogger(ctx).Warn("put to cache", "error", err, "key", key, "field", field)
 		}
 	}
 
@@ -213,7 +213,7 @@ func (s *service) Create(ctx context.Context, req SvcCreateReq) (model.Task, err
 		return zero, err
 	}
 
-	if err := s.cache.Invalidate(ctx, invalidatePattern(task.TeamID)); err != nil {
+	if err := s.cache.Del(ctx, buildCacheKey(task.TeamID)); err != nil {
 		logging.GetLogger(ctx).Warn("invalidate cache", "error", err, "team_id", task.TeamID)
 	}
 
@@ -469,7 +469,7 @@ func (s *service) Update(ctx context.Context, req SvcUpdateReq) (model.Task, err
 		return zero, err
 	}
 
-	if err := s.cache.Invalidate(ctx, invalidatePattern(task.TeamID)); err != nil {
+	if err := s.cache.Del(ctx, buildCacheKey(task.TeamID)); err != nil {
 		logging.GetLogger(ctx).Warn("cache invalidate", "error", err)
 	}
 
