@@ -15,6 +15,7 @@ import (
 	"github.com/aaa2ppp/be"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pressly/goose/v3"
+	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -158,4 +159,40 @@ func (c *NoopCache) Put(ctx context.Context, key, field string, val any) error {
 }
 func (c *NoopCache) Del(ctx context.Context, key string) error {
 	return nil
+}
+
+// StartTestRedis поднимает контейнер Redis и возвращает клиент и функцию очистки.
+func StartTestRedis(t *testing.T) (*redis.Client, func()) {
+	ctx := context.Background()
+	containerLogger := log.New(io.Discard, "", 0)
+
+	req := testcontainers.ContainerRequest{
+		Image:        "redis:7-alpine",
+		ExposedPorts: []string{"6379/tcp"},
+		WaitingFor:   wait.ForLog("Ready to accept connections"),
+	}
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+		Logger:           containerLogger,
+	})
+	be.Err(t, err, nil)
+
+	host, err := container.Host(ctx)
+	be.Err(t, err, nil)
+	port, err := container.MappedPort(ctx, "6379/tcp")
+	be.Err(t, err, nil)
+
+	client := redis.NewClient(&redis.Options{
+		Addr: fmt.Sprintf("%s:%s", host, port.Port()),
+	})
+	err = client.Ping(ctx).Err()
+	be.Err(t, err, nil)
+
+	cleanup := func() {
+		client.Close()
+		_ = container.Terminate(ctx)
+	}
+
+	return client, cleanup
 }

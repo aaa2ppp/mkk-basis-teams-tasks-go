@@ -138,6 +138,10 @@ func buildCacheField(req SvcListReq) string {
 	return kb.String()
 }
 
+func (s *service) invalidateCache(ctx context.Context, teamID model.TeamID) error {
+	return s.cache.Del(ctx, buildCacheKey(teamID))
+}
+
 func (s *service) getOrLoadTasks(ctx context.Context, req SvcListReq, fn func() ([]model.Task, error)) ([]model.Task, error) {
 
 	// Используем singleflight даже при наличии кеша, чтобы избежать множественных
@@ -244,7 +248,7 @@ func (s *service) Create(ctx context.Context, req SvcCreateReq) (model.Task, err
 		return zero, err
 	}
 
-	if err := s.cache.Del(ctx, buildCacheKey(task.TeamID)); err != nil {
+	if err := s.invalidateCache(ctx, req.TeamID); err != nil {
 		logging.GetLogger(ctx).Warn("invalidate cache", "error", err, "team_id", task.TeamID)
 	}
 
@@ -500,7 +504,7 @@ func (s *service) Update(ctx context.Context, req SvcUpdateReq) (model.Task, err
 		return zero, err
 	}
 
-	if err := s.cache.Del(ctx, buildCacheKey(task.TeamID)); err != nil {
+	if err := s.invalidateCache(ctx, task.TeamID); err != nil {
 		logging.GetLogger(ctx).Warn("cache invalidate", "error", err)
 	}
 
