@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"aaa2ppp/teams-tasks/internal/features/tasks"
+	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
@@ -302,7 +303,7 @@ func TestTaskUpdate(t *testing.T) {
 
 			user := model.User{ID: tt.userID}
 			updated, err := taskService.Update(
-				contextWithUser(ctx, user),
+				auth.ContextWithUserForTest(ctx, user),
 				req,
 			)
 

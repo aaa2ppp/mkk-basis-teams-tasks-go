@@ -1,5 +1,3 @@
-//go:build test
-
 package tests
 
 import (
@@ -12,7 +10,6 @@ import (
 	"time"
 
 	database "aaa2ppp/teams-tasks/internal/db"
-	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
@@ -162,7 +159,3 @@ func (c *NoopCache) Put(ctx context.Context, key, field string, val any) error {
 func (c *NoopCache) Del(ctx context.Context, key string) error {
 	return nil
 }
-
-// ---- Управление контекстом ----
-
-var contextWithUser = auth.ContextWithUserForTest

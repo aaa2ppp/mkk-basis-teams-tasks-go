@@ -1,5 +1,3 @@
-//go:build test
-
 package tests
 
 import (
@@ -8,6 +6,7 @@ import (
 	"time"
 
 	"aaa2ppp/teams-tasks/internal/features/tasks"
+	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
@@ -31,7 +30,7 @@ func TestTaskPagination(t *testing.T) {
 	AddMember(t, db, teamID, user, model.RoleMember)
 
 	// Контекст пользователя
-	userCtx := contextWithUser(ctx, model.User{
+	userCtx := auth.ContextWithUserForTest(ctx, model.User{
 		ID: user,
 		TeamRoles: map[string]model.Role{
 			teamID.String(): model.RoleMember,
