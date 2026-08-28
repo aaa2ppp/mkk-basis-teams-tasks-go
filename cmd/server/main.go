@@ -58,6 +58,8 @@ const (
 
 func run(ctx context.Context, cfg config.Config) (err error) {
 	logger := logging.New(cfg.Log)
+	slog.SetDefault(logger)
+
 	tokens := auth.New(cfg.Auth)
 
 	db, err := database.Open(ctx, cfg.DB)

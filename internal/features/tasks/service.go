@@ -158,6 +158,8 @@ func (s *service) getOrLoadTasks(ctx context.Context, req SvcListReq, fn func() 
 			logging.GetLogger(ctx).Debug("match cache", "key", key, "field", field)
 
 		} else {
+			logging.GetLogger(ctx).Debug("going to base", "key", key, "field", field)
+
 			if !errors.Is(err, model.ErrNotFound) {
 				logging.GetLogger(ctx).Warn("get from cache", "error", err, "key", key, "field", field)
 			}

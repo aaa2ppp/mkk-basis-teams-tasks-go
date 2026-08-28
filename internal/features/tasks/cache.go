@@ -6,21 +6,20 @@ import (
 	"fmt"
 	"time"
 
-	"aaa2ppp/teams-tasks/internal/lib/logging"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type cache struct {
-	redis *redis.Client
-	ttl   time.Duration
+	redis      *redis.Client
+	ttlSeconds int64
 }
 
 var _ Cache = &cache{}
 
 func NewCache(rdb *redis.Client, ttl time.Duration) *cache {
-	return &cache{redis: rdb, ttl: ttl}
+	return &cache{redis: rdb, ttlSeconds: int64(ttl / time.Second)}
 }
 
 func (c cache) Get(ctx context.Context, key, field string, val any) error {
@@ -41,42 +40,19 @@ func (c cache) Get(ctx context.Context, key, field string, val any) error {
 }
 
 func (c cache) Put(ctx context.Context, key string, field string, val any) error {
-	const op = "tasks.cache.Put"
-
 	data, err := json.Marshal(val)
 	if err != nil {
 		return fmt.Errorf("cache marshal: %w", err)
 	}
 
 	script := `
-		local created = redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
-		local ok, expire_result = pcall(redis.call, 'EXPIRE', KEYS[1], ARGV[3])
-
-		if not ok or expire_result == 0 then
-			if created == 1 then
-				redis.call('DEL', KEYS[1])
-				error('new record but expire failed, rolled back')
-			else
-				return 2
-			end
-		end
-
+		redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+		redis.call('EXPIRE', KEYS[1], ARGV[3])
 		return 1
 	`
 
-	result, err := c.redis.Eval(ctx, script, []string{key}, field, data, c.ttl.Seconds()).Int()
-	if err != nil {
-		return fmt.Errorf("eval: %w", err)
-	}
-
-	switch result {
-	case 1:
-		// success
-	case 2:
-		logger := logging.GetLogger(ctx).With("op", op)
-		logger.Warn("data saved but expire failed for existing field", "key", key, "field", field)
-	default:
-		return fmt.Errorf("unexpected result code %d", result)
+	if err := c.redis.Do(ctx, "EVAL", script, 1, key, field, data, c.ttlSeconds).Err(); err != nil {
+		return err
 	}
 
 	return nil
