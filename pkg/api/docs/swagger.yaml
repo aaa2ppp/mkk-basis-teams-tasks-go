@@ -117,7 +117,7 @@ definitions:
         type: integer
       name:
         type: string
-      team_roles:
+      roles:
         additionalProperties:
           type: string
         example:

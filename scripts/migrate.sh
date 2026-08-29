@@ -19,6 +19,6 @@ user=${DB_USER:-app-user}
 password=${DB_PASSWORD?DB_PASSWORD is not set. Please run: source dev-env}
 
 export GOOSE_DRIVER=mysql
-export GOOSE_DBSTRING="$user:$password@tcp($host:$port)/$dbname?parseTime=true"
+export GOOSE_DBSTRING="$user:$password@tcp($host:$port)/$dbname?parseTime=true&loc=UTC"
 export GOOSE_MIGRATION_DIR=$MIGRATIONS_DIR
 goose "$@"

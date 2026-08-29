@@ -222,7 +222,7 @@ func (s *service) Create(ctx context.Context, req SvcCreateReq) (model.Task, err
 		return zero, fmt.Errorf("%w: %v", model.ErrUnauthorized, err)
 	}
 
-	if curUser.TeamRoles[req.TeamID.String()] == 0 {
+	if curUser.Roles[req.TeamID.String()] == 0 {
 		return zero, model.ErrForbidden
 	}
 
@@ -238,6 +238,9 @@ func (s *service) Create(ctx context.Context, req SvcCreateReq) (model.Task, err
 			AssigneeID:  req.AssigneeID,
 		})
 		if err != nil {
+			if errors.Is(err, model.ErrNoRowsAffected) {
+				return model.ErrForbidden
+			}
 			return err
 		}
 		task, err = storage.GetByID(ctx, DBGetByIDReq{
@@ -298,7 +301,7 @@ func (s *service) List(ctx context.Context, req SvcListReq) (SvcListResp, error)
 		return zero, err
 	}
 
-	if req.TeamID != 0 && curUser.TeamRoles[req.TeamID.String()] == 0 {
+	if req.TeamID != 0 && curUser.Roles[req.TeamID.String()] == 0 {
 		return zero, model.ErrForbidden
 	}
 
@@ -529,6 +532,9 @@ func (s *service) AddComment(ctx context.Context, req SvcAddCommentReq) (model.T
 			Allow:   TeamOwner | TeamAdmin | TaskCreator | TaskAssignee,
 		})
 		if err != nil {
+			if errors.Is(err, model.ErrNoRowsAffected) {
+				return model.ErrForbidden
+			}
 			return err
 		}
 		comment, err = storage.GetCommentByID(ctx, DBGetCommentByIDReq{

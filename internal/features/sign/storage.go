@@ -78,7 +78,7 @@ func (s *storage) GetRoles(ctx context.Context, userID model.UserID) (map[string
 		return nil, err
 	}
 
-	roles := map[string]model.Role{}
+	roles := model.UserRoles{}
 	var r model.TeamMember
 	for rows.Next() {
 		r = model.TeamMember{}

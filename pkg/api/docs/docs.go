@@ -766,7 +766,7 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "team_roles": {
+                "roles": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"

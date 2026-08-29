@@ -2,6 +2,7 @@ package teams
 
 import (
 	"context"
+	"errors"
 
 	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
@@ -108,20 +109,33 @@ func (s *service) Create(ctx context.Context, req SvcCreateReq) (model.Team, err
 }
 
 func (s *service) AddMember(ctx context.Context, req SvcAddMemberReq) error {
+	if req.MemberRole == model.RoleOwner {
+		return model.ErrForbidden
+	}
+
 	curUser, err := auth.GetCurrentUser(ctx)
 	if err != nil {
 		return err
 	}
-	if role := curUser.TeamRoles[req.TeamID.String()]; role != model.RoleOwner && role != model.RoleAdmin {
+
+	if role := curUser.Roles[req.TeamID.String()]; role != model.RoleOwner && role != model.RoleAdmin {
 		return model.ErrForbidden
 	}
-	return s.storage.AddMember(ctx, DBAddMemberReq{
+
+	if err = s.storage.AddMember(ctx, DBAddMemberReq{
 		TeamID:     req.TeamID,
 		UserID:     req.UserID,
 		UserEmail:  req.UserEmail,
 		MemberRole: req.MemberRole,
 		CurUserID:  curUser.ID,
-	})
+	}); err != nil {
+		if errors.Is(err, model.ErrNoRowsAffected) {
+			return model.ErrForbidden
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (s *service) List(ctx context.Context, req SvcListReq) ([]model.Team, error) {
@@ -218,7 +232,7 @@ func (s *service) GenReport(ctx context.Context, teamID model.TeamID) ([]Metric,
 	if err != nil {
 		return nil, err
 	}
-	if role := curUser.TeamRoles[teamID.String()]; role != model.RoleOwner && role != model.RoleAdmin {
+	if role := curUser.Roles[teamID.String()]; role != model.RoleOwner && role != model.RoleAdmin {
 		return nil, model.ErrForbidden
 	}
 	return s.storage.GenReport(ctx, DBGenReportReq{

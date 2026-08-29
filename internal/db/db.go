@@ -32,7 +32,7 @@ func Open(ctx context.Context, cfg Config) (*DB, error) {
 	}
 
 	// DSN: user:password@tcp(host:port)/dbname?parseTime=true
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", cfg.User, cfg.Password, host, port, cfg.DBName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=UTC", cfg.User, cfg.Password, host, port, cfg.DBName)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

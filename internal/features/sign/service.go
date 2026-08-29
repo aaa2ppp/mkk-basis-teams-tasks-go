@@ -61,7 +61,7 @@ func (s *service) Login(ctx context.Context, req LoginReq) (LoginResp, error) {
 	if err != nil {
 		return zero, err
 	}
-	user.TeamRoles = roles
+	user.Roles = roles
 
 	token, err := s.token.GenerateToken(user)
 	if err != nil {

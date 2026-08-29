@@ -81,7 +81,7 @@ func TestCache(t *testing.T) {
 	// Будем вносить изменения в контексте создателя команды (доступно все)
 	ownerCtx := auth.ContextWithUserForTest(ctx, model.User{
 		ID: userOwner,
-		TeamRoles: map[string]model.Role{
+		Roles: map[string]model.Role{
 			teamID.String(): model.RoleOwner,
 		},
 	})
@@ -250,7 +250,7 @@ func TestCache(t *testing.T) {
 					defer wg.Done()
 					userCtx := auth.ContextWithUserForTest(ctx, model.User{
 						ID: members[i%len(members)],
-						TeamRoles: map[string]model.Role{
+						Roles: map[string]model.Role{
 							teamID.String(): model.RoleMember,
 						},
 					})

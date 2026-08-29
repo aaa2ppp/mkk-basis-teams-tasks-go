@@ -32,7 +32,7 @@ func TestTaskPagination(t *testing.T) {
 	// Контекст пользователя
 	userCtx := auth.ContextWithUserForTest(ctx, model.User{
 		ID: user,
-		TeamRoles: map[string]model.Role{
+		Roles: map[string]model.Role{
 			teamID.String(): model.RoleMember,
 		},
 	})

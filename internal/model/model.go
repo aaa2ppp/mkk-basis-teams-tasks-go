@@ -23,17 +23,19 @@ func (id ID) String() string { return strconv.FormatInt(int64(id), 10) }
 
 type UserID ID
 
+type UserRoles map[string]Role
+
 type User struct {
-	ID           UserID          `json:"id,omitempty"`
-	Email        string          `json:"email,omitempty" format:"email"`
-	PasswordHash string          `json:"-"`
-	Name         string          `json:"name,omitempty"`
-	CreatedAt    time.Time       `json:"created_at,omitzero" format:"date-time"`
-	TeamRoles    map[string]Role `json:"team_roles,omitempty" swaggertype:"object,string" example:"123:member"`
+	ID           UserID    `json:"id,omitempty"`
+	Email        string    `json:"email,omitempty" format:"email"`
+	PasswordHash string    `json:"-"`
+	Name         string    `json:"name,omitempty"`
+	CreatedAt    time.Time `json:"created_at,omitzero" format:"date-time"`
+	Roles        UserRoles `json:"roles,omitempty" swaggertype:"object,string" example:"123:member"`
 }
 
 func (u User) Clone() User {
-	u.TeamRoles = maps.Clone(u.TeamRoles)
+	u.Roles = maps.Clone(u.Roles)
 	return u
 }
 

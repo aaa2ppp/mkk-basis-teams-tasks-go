@@ -126,7 +126,7 @@ func TestService_List_SingleflightCoalescesCacheMisses(t *testing.T) {
 					defer wg.Done()
 					user := model.User{
 						ID: model.UserID(i),
-						TeamRoles: map[string]model.Role{
+						Roles: map[string]model.Role{
 							"123": model.RoleMember,
 						},
 					}
