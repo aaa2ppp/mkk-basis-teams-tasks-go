@@ -109,6 +109,9 @@ docker-redis-up: ## start redis container
 docker-redis-down: ## stop redis container
 	$(DOCKER_COMPOSE) down $(REDIS_SERVICE)
 
+docker-redis-shell:
+	$(DOCKER_COMPOSE) exec $(REDIS_SERVICE) sh -c redis-cli
+
 
 # ============================================
 # DEVELOPMENT COMMANDS (local)
