@@ -14,7 +14,16 @@ type storage struct {
 	db db.DBTX
 }
 
-func NewStorage(db db.DBTX) *storage {
+type WithExecutor interface {
+	Executor() db.Executor
+}
+
+func NewStorage(db db.DBTX) Storage {
+	if we, ok := db.(WithExecutor); ok {
+		if exec := we.Executor(); exec != nil {
+			return &storageWithExecutor{storage{db}, exec}
+		}
+	}
 	return &storage{db: db}
 }
 
@@ -93,3 +102,35 @@ func (s *storage) GetRoles(ctx context.Context, userID model.UserID) (map[string
 	}
 	return roles, err
 }
+
+type storageWithExecutor struct {
+	raw  storage
+	exec db.Executor
+}
+
+// Create implements [Storage].
+func (b *storageWithExecutor) Create(ctx context.Context, user model.User) (model.UserID, error) {
+	return db.Execute(b.exec, ctx, user, b.raw.Create)
+}
+
+// GetByEmail implements [Storage].
+func (b *storageWithExecutor) GetByEmail(ctx context.Context, email string) (model.User, error) {
+	return db.Execute(b.exec, ctx, email, b.raw.GetByEmail)
+}
+
+// GetByID implements [Storage].
+func (b *storageWithExecutor) GetByID(ctx context.Context, userID model.UserID) (model.User, error) {
+	return db.Execute(b.exec, ctx, userID, b.raw.GetByID)
+}
+
+// GetRoles implements [Storage].
+func (b *storageWithExecutor) GetRoles(ctx context.Context, userID model.UserID) (map[string]model.Role, error) {
+	return db.Execute(b.exec, ctx, userID, b.raw.GetRoles)
+}
+
+// WithTx implements [Storage].
+func (b *storageWithExecutor) WithTx(tx db.DBTX) Storage {
+	return b.raw.WithTx(tx)
+}
+
+var _ Storage = &storageWithExecutor{}

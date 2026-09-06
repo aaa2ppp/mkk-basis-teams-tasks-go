@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/lib/logging"
+
 	"github.com/go-sql-driver/mysql"
 	"github.com/sony/gobreaker/v2"
 )
@@ -27,11 +29,11 @@ type CircuitBreakerConfig struct {
 // БЕЗ использования обертывания %w. Обертывание сохраняет тип.
 // Breaker будет считать такую ошибку сбоем.
 type CircuitBreaker struct {
-	cb *gobreaker.CircuitBreaker[int] // stub type not be used
+	cb *gobreaker.CircuitBreaker[struct{}] // stub type not be used
 }
 
 func NewCircuitBreaker(cfg CircuitBreakerConfig) *CircuitBreaker {
-	cb := gobreaker.NewCircuitBreaker[int](gobreaker.Settings{
+	cb := gobreaker.NewCircuitBreaker[struct{}](gobreaker.Settings{
 		Name:         "mysql",
 		MaxRequests:  uint32(cfg.HalfOpenMaxReq),
 		Interval:     cfg.WindowInterval,
@@ -46,7 +48,14 @@ func NewCircuitBreaker(cfg CircuitBreakerConfig) *CircuitBreaker {
 			return failureRatio >= cfg.FailureRatio
 		},
 		IsSuccessful: func(err error) bool {
-			if _, ok := err.(*mysql.MySQLError); ok {
+			if _, ok := errors.AsType[*mysql.MySQLError](err); ok {
+				ctx := context.Background()
+				if se, ok := err.(*shuttleError); ok {
+					ctx = se.ctx
+					err = se.err
+				}
+				logger := logging.GetLogger(ctx)
+				logger.Debug("CircuitBreaker: detected fail", "error", err)
 				return false
 			}
 			return true
@@ -58,7 +67,24 @@ func NewCircuitBreaker(cfg CircuitBreakerConfig) *CircuitBreaker {
 	return &CircuitBreaker{cb}
 }
 
-func (cb *CircuitBreaker) Execute(fn func() error) error {
-	_, err := cb.cb.Execute(func() (int, error) { return 0, fn() })
+// Обертка, чтобы дотащить контекст запроса до gobreaker.CircuitBreaker
+type shuttleError struct {
+	ctx context.Context
+	err error
+}
+
+func (se *shuttleError) Error() string { return se.err.Error() }
+func (se *shuttleError) Unwrap() error { return se.err }
+
+func (cb *CircuitBreaker) Execute(ctx context.Context, fn func(context.Context) error) error {
+	_, err := cb.cb.Execute(func() (struct{}, error) {
+		if err := fn(ctx); err != nil {
+			return struct{}{}, &shuttleError{ctx, err}
+		}
+		return struct{}{}, nil
+	})
+	if se, ok := err.(*shuttleError); ok {
+		return se.err
+	}
 	return err
 }

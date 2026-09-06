@@ -14,13 +14,22 @@ import (
 	"aaa2ppp/teams-tasks/internal/model"
 )
 
+type WithExecutor interface {
+	Executor() db.Executor
+}
+
 type storage struct {
 	db db.DBTX
 }
 
 var _ Storage = &storage{}
 
-func NewStorage(db db.DBTX) *storage {
+func NewStorage(db db.DBTX) Storage {
+	if we, ok := db.(WithExecutor); ok {
+		if exec := we.Executor(); exec != nil {
+			return &storageWithExecutor{storage{db}, exec}
+		}
+	}
 	return &storage{db: db}
 }
 
@@ -482,3 +491,65 @@ func (s *storage) GetMemberRole(ctx context.Context, req DBGetMemberRoleReq) (mo
 
 	return role, nil
 }
+
+type storageWithExecutor struct {
+	raw  storage
+	exec db.Executor
+}
+
+// AddComment implements [Storage].
+func (s *storageWithExecutor) AddComment(ctx context.Context, req DBAddCommentReq) (model.TaskCommentID, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.AddComment)
+}
+
+// AddHistoryEvent implements [Storage].
+func (s *storageWithExecutor) AddHistoryEvent(ctx context.Context, req DBAddHistoryEventReq) (model.TaskHistoryEventID, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.AddHistoryEvent)
+}
+
+// Create implements [Storage].
+func (s *storageWithExecutor) Create(ctx context.Context, req DBCreateReq) (model.TaskID, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.Create)
+}
+
+// GetByID implements [Storage].
+func (s *storageWithExecutor) GetByID(ctx context.Context, req DBGetByIDReq) (model.Task, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GetByID)
+}
+
+// GetCommentByID implements [Storage].
+func (s *storageWithExecutor) GetCommentByID(ctx context.Context, req DBGetCommentByIDReq) (model.TaskComment, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GetCommentByID)
+}
+
+// GetComments implements [Storage].
+func (s *storageWithExecutor) GetComments(ctx context.Context, taskIDs []model.TaskID) ([]model.TaskComment, error) {
+	return db.Execute(s.exec, ctx, taskIDs, s.raw.GetComments)
+}
+
+// GetHistory implements [Storage].
+func (s *storageWithExecutor) GetHistory(ctx context.Context, taskIDs []model.TaskID) ([]model.TaskHistoryEvent, error) {
+	return db.Execute(s.exec, ctx, taskIDs, s.raw.GetHistory)
+}
+
+// GetMemberRole implements [Storage].
+func (s *storageWithExecutor) GetMemberRole(ctx context.Context, req DBGetMemberRoleReq) (model.Role, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GetMemberRole)
+}
+
+// List implements [Storage].
+func (s *storageWithExecutor) List(ctx context.Context, req DBListReq) ([]model.Task, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.List)
+}
+
+// Update implements [Storage].
+func (s *storageWithExecutor) Update(ctx context.Context, req DBUpdateReq) error {
+	return db.ExecuteErr(s.exec, ctx, req, s.raw.Update)
+}
+
+// WithTx implements [Storage].
+func (s *storageWithExecutor) WithTx(tx db.DBTX) Storage {
+	return s.raw.WithTx(tx)
+}
+
+var _ Storage = &storageWithExecutor{}

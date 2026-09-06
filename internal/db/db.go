@@ -7,19 +7,21 @@ import (
 	"strings"
 
 	"aaa2ppp/teams-tasks/internal/lib/logging"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type Config struct {
-	Addr           string
-	User           string
-	Password       string
-	DBName         string
-	SSLMode        string
-	CircuitBreaker CircuitBreakerConfig
+	Addr     string
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
 }
 
 type DB struct {
 	sqlDB *sql.DB
+	exec  Executor
 }
 
 func Open(ctx context.Context, cfg Config) (*DB, error) {
@@ -39,10 +41,20 @@ func Open(ctx context.Context, cfg Config) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{db}, nil
+	return &DB{sqlDB: db}, nil
+}
+
+func New(db *sql.DB) *DB {
+	return &DB{sqlDB: db}
 }
 
 func (db *DB) DB() *sql.DB { return db.sqlDB }
+
+func (db *DB) WithExecutor(exec Executor) *DB {
+	return &DB{sqlDB: db.sqlDB, exec: exec}
+}
+
+func (db *DB) Executor() Executor { return db.exec }
 
 func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return db.sqlDB.ExecContext(ctx, query, args...)
@@ -66,7 +78,7 @@ type DBTX interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func (db *DB) InTx(ctx context.Context, fn func(ctx context.Context, tx DBTX) error) error {
+func (db *DB) inTx(ctx context.Context, fn func(ctx context.Context, tx DBTX) error) error {
 	tx, err := db.sqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -80,4 +92,11 @@ func (db *DB) InTx(ctx context.Context, fn func(ctx context.Context, tx DBTX) er
 		return err
 	}
 	return tx.Commit()
+}
+
+func (db *DB) InTx(ctx context.Context, fn func(context.Context, DBTX) error) error {
+	if exec := db.exec; exec != nil {
+		return ExecuteErr(exec, ctx, fn, db.inTx)
+	}
+	return db.inTx(ctx, fn)
 }

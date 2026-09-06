@@ -11,11 +11,20 @@ import (
 	"aaa2ppp/teams-tasks/internal/model"
 )
 
+type WithExecutor interface {
+	Executor() db.Executor
+}
+
 type storage struct {
 	db db.DBTX
 }
 
-func NewStorage(db db.DBTX) *storage {
+func NewStorage(db db.DBTX) Storage {
+	if we, ok := db.(WithExecutor); ok {
+		if exec := we.Executor(); exec != nil {
+			return &storageWithExecutor{storage{db}, exec}
+		}
+	}
 	return &storage{db: db}
 }
 
@@ -261,3 +270,50 @@ func (s *storage) GetTasks(ctx context.Context, req DBGetByIDsReq) ([]model.Task
 
 	return tasks, nil
 }
+
+type storageWithExecutor struct {
+	raw  storage
+	exec db.Executor
+}
+
+// AddMember implements [Storage].
+func (s *storageWithExecutor) AddMember(ctx context.Context, req DBAddMemberReq) error {
+	return db.ExecuteErr(s.exec, ctx, req, s.raw.AddMember)
+}
+
+// Create implements [Storage].
+func (s *storageWithExecutor) Create(ctx context.Context, req DBCreateReq) (model.TeamID, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.Create)
+}
+
+// GenReport implements [Storage].
+func (s *storageWithExecutor) GenReport(ctx context.Context, req DBGenReportReq) ([]Metric, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GenReport)
+}
+
+// GetByID implements [Storage].
+func (s *storageWithExecutor) GetByID(ctx context.Context, req DBGetByIDReq) (model.Team, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GetByID)
+}
+
+// GetMembers implements [Storage].
+func (s *storageWithExecutor) GetMembers(ctx context.Context, req DBGetByIDsReq) ([]model.TeamMember, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GetMembers)
+}
+
+// GetTasks implements [Storage].
+func (s *storageWithExecutor) GetTasks(ctx context.Context, req DBGetByIDsReq) ([]model.Task, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.GetTasks)
+}
+
+// List implements [Storage].
+func (s *storageWithExecutor) List(ctx context.Context, req DBListReq) ([]model.Team, error) {
+	return db.Execute(s.exec, ctx, req, s.raw.List)
+}
+
+// WithTx implements [Storage].
+func (s *storageWithExecutor) WithTx(tx db.DBTX) Storage {
+	return s.raw.WithTx(tx)
+}
+
+var _ Storage = &storageWithExecutor{}

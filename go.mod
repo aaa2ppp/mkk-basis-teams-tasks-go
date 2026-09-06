@@ -3,6 +3,7 @@ module aaa2ppp/teams-tasks
 go 1.26.5
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/aaa2ppp/be v0.0.0-20260806170358-5bee5146bd6e
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-sql-driver/mysql v1.10.0

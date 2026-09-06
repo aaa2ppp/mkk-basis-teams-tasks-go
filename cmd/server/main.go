@@ -70,7 +70,8 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 		err = errors.Join(err, db.Close())
 	}()
 
-	cd := database.NewCircuitBreaker(cfg.DB.CircuitBreaker)
+	cd := database.NewCircuitBreaker(cfg.DBCircuitBreaker)
+	db = db.WithExecutor(cd)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         cfg.Redis.Addr,
@@ -84,19 +85,16 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 	signAPI := newSignAPI(signAPIConfig{
 		Tokens: tokens,
 		DB:     db,
-		CB:     cd,
 	})
 
 	teamsAPI := newTeamsAPI(teamsAPIConfig{
 		Tokens: tokens,
 		DB:     db,
-		CB:     cd,
 	})
 
 	tasksAPI := newTasksAPI(tasksAPIConfig{
 		Tokens:   tokens,
 		DB:       db,
-		CB:       cd,
 		RDB:      rdb,
 		CacheTTL: cfg.Cache.TasksTLL,
 	})
@@ -164,38 +162,29 @@ func run(ctx context.Context, cfg config.Config) (err error) {
 type signAPIConfig struct {
 	Tokens *auth.Tokens
 	DB     *database.DB
-	CB     *database.CircuitBreaker
 }
 
 func newSignAPI(c signAPIConfig) http.Handler {
 	return sign.NewAPI(
-		sign.NewBreaker(
-			c.CB,
-			sign.NewService(
-				sign.NewStorage(c.DB),
-				c.DB,
-				c.Tokens,
-			),
+		sign.NewService(
+			sign.NewStorage(c.DB),
+			c.DB,
+			c.Tokens,
 		),
 	)
-
 }
 
 type teamsAPIConfig struct {
 	Tokens *auth.Tokens
 	DB     *database.DB
-	CB     *database.CircuitBreaker
 }
 
 func newTeamsAPI(c teamsAPIConfig) http.Handler {
 	return c.Tokens.Middleware(
 		teams.NewAPI(
-			teams.NewBreaker(
-				c.CB,
-				teams.NewService(
-					teams.NewStorage(c.DB),
-					c.DB,
-				),
+			teams.NewService(
+				teams.NewStorage(c.DB),
+				c.DB,
 			),
 		),
 	)
@@ -204,7 +193,6 @@ func newTeamsAPI(c teamsAPIConfig) http.Handler {
 type tasksAPIConfig struct {
 	Tokens   *auth.Tokens
 	DB       *database.DB
-	CB       *database.CircuitBreaker
 	RDB      *redis.Client
 	CacheTTL time.Duration
 }
@@ -212,13 +200,10 @@ type tasksAPIConfig struct {
 func newTasksAPI(c tasksAPIConfig) http.Handler {
 	return c.Tokens.Middleware(
 		tasks.NewAPI(
-			tasks.NewBreaker(
-				c.CB,
-				tasks.NewService(
-					tasks.NewStorage(c.DB),
-					c.DB,
-					tasks.NewCache(c.RDB, c.CacheTTL),
-				),
+			tasks.NewService(
+				tasks.NewStorage(c.DB),
+				c.DB,
+				tasks.NewCache(c.RDB, c.CacheTTL),
 			),
 		),
 	)
