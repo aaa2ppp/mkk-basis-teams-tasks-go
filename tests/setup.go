@@ -20,6 +20,11 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	mariadbImage = "mariadb:12.3.2-noble"
+	redisImage   = "redis:8.10.1-alpine"
+)
+
 // ---- Конструкторы для Nullable ----
 
 func Val[T any](v T) model.Nullable[T] {
@@ -48,7 +53,7 @@ func StartTestDatabase(t *testing.T) (*database.DB, func()) {
 	containerLogger := log.New(io.Discard, "", 0)
 
 	req := testcontainers.ContainerRequest{
-		Image:        "mariadb:12.3.2-noble",
+		Image:        mariadbImage,
 		ExposedPorts: []string{"3306/tcp"},
 		Env: map[string]string{
 			"MYSQL_ROOT_PASSWORD": "testroot",
@@ -167,7 +172,7 @@ func StartTestRedis(t *testing.T) (*redis.Client, func()) {
 	containerLogger := log.New(io.Discard, "", 0)
 
 	req := testcontainers.ContainerRequest{
-		Image:        "redis:7-alpine",
+		Image:        redisImage,
 		ExposedPorts: []string{"6379/tcp"},
 		WaitingFor:   wait.ForLog("Ready to accept connections"),
 	}
