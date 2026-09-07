@@ -86,6 +86,11 @@ func (cfg Config) httpMiddleware(next http.Handler) http.HandlerFunc {
 			return
 		}
 
+		if err := claims.Validate(jwt.Expected{Time: time.Now()}); err != nil {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+
 		ctx := contextWithUser(r.Context(), claims.User)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
