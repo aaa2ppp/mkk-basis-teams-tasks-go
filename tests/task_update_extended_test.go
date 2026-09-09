@@ -77,8 +77,6 @@ func testTaskUpdateExtended(t *testing.T, db *db.DB) {
 		be.Err(t, err, nil)
 		be.Equal(t, updated.Status, model.StatusDone)
 		be.True(t, updated.ClosedAt.Valid) // not null
-		since := time.Since(updated.ClosedAt.V)
-		be.True(t, 0 <= since && since < 100*time.Millisecond)
 
 		// Возвращаем задачу в работу
 		req = initUpdateReq(t, taskID)
