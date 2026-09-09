@@ -138,7 +138,7 @@ check-swag: ## install swag if need
 	@which swag 2>/dev/null || go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
 check-enumer: ## install enumer if need
-	@which enumer 2>/dev/null || go install https://github.com/dmarkham/enumer@v1.6.3
+	@which enumer 2>/dev/null || go install github.com/dmarkham/enumer@v1.6.3
 
 check-golangci-lint: ## install golangci-lint if need
 	@which golangci-lint 2>/dev/null || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
