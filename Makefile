@@ -72,6 +72,7 @@ docker-run: generate docker-build docker-up ## run server in docker
 
 .PHONY: docker-build docker-up docker-down docker-down-volumes docker-logs
 .PHONY: docker-db-up docker-db-down docker-db-down-volumes docker-db-shell
+.PHONE: docker-redis-up docker-redis-down docker-redis-shell
 
 docker-build: ## build docker images
 	$(DOCKER_COMPOSE) build
@@ -117,7 +118,8 @@ docker-redis-shell:
 # DEVELOPMENT COMMANDS (local)
 # ============================================
 
-.PHONY: init-workspace deps check-goose check-swag check-golangci-lint check-tools build swag-generate go-generate generate test clean merge
+.PHONY: init-workspace deps check-goose check-swag check-golangci-lint check-tools
+.PHONY: build swag-generate go-generate generate test clean merge
 
 init-workspace: ## create/update go.work for local development (includes main module and tests)
 	@test -f go.work || go work init
@@ -172,6 +174,9 @@ generate: go-generate swag-generate ## generate all
 lint: ## run linters
 	$(LINTER) run ./...
 
+lint-tests: ## run linters on tests mod
+	$(LINTER) run --build-tags=test ./tests/...
+
 test: ## run tests
 	go test --tags=test ./...
 
@@ -205,10 +210,13 @@ db-shell: docker-db-shell ## alias for docker-db-shell
 # REDIS (local)
 # ============================================
 
+.PHONY: redis-up redis-down redis-shell
+
 redis-up: docker-redis-up ## alias for docker-redis-up
 
-redis-down: docker-redis-down ## alias for dosker-redis-down
+redis-down: docker-redis-down ## alias for docker-redis-down
 
+redis-shell: dosker-redis-shell ## alias for docker-redis-shell
 
 # ============================================
 # MIGRATIONS (local)
@@ -229,7 +237,7 @@ migrate-status: ## show migration status (local)
 # UTILS
 # ============================================
 
-.PHONY: FORCE patch help 
+.PHONY: FORCE merge patch help 
 
 FORCE:
 
@@ -238,7 +246,7 @@ merge: ## merge code to file for AI review
 	$(MERGE_CODE) $(SRC) > $(TMP_DIR)/$(DST).code 
 
 .NOTPARALLEL: patch
-patch: deps generate lint test build ## make precommit patch
+patch: deps generate lint test lint-tests test-integration build ## make precommit patch
 	@mkdir -p $(TMP_DIR)
 	
 	@(set -e; \
