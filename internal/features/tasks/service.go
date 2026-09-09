@@ -194,8 +194,6 @@ func (s *service) getOrLoadTasks(ctx context.Context, req SvcListReq, fn func() 
 	return res.Val.([]model.Task), nil
 }
 
-var defaultSF singleflight.Group
-
 type service struct {
 	storage    Storage
 	transactor Transactor
@@ -210,7 +208,7 @@ func NewService(storage Storage, transactor Transactor, cache Cache) *service {
 		storage:    storage,
 		transactor: transactor,
 		cache:      cache,
-		sf:         &defaultSF,
+		sf:         &singleflight.Group{},
 	}
 }
 
