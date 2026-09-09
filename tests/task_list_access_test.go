@@ -1,24 +1,24 @@
 package tests
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTaskListAccess проверяет, что список задач доступен только для своей команды,
+// testTaskListAccess проверяет, что список задач доступен только для своей команды,
 // а также корректность фильтрации по статусу и исполнителю.
-func TestTaskListAccess(t *testing.T) {
+func testTaskListAccess(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	taskStorage := tasks.NewStorage(db)
 	cache := &NoopCache{}
@@ -53,11 +53,24 @@ func TestTaskListAccess(t *testing.T) {
 		})
 		resp, err := taskSvc.List(ctxMember, req)
 		be.Err(t, err, nil)
-		be.Equal(t, len(resp.Tasks), 2)
+
+		var fail bool
+		fail = fail || !be.Equal(t, len(resp.Tasks), 2)
+
 		ids := map[model.TaskID]bool{task1: true, task2: true}
 		for _, task := range resp.Tasks {
-			be.True(t, ids[task.ID])
+			fail = fail || !be.True(t, ids[task.ID])
 		}
+
+		if fail {
+			var b bytes.Buffer
+			enc := json.NewEncoder(&b)
+			enc.SetIndent("", "    ")
+			enc.Encode(resp) //nolint:errcheck
+			t.Logf("%s", b.Bytes())
+			return
+		}
+
 	})
 
 	t.Run("member of team1 cannot list team2 tasks", func(t *testing.T) {

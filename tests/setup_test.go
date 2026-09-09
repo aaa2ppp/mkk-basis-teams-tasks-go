@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,8 +23,9 @@ import (
 )
 
 const (
-	mariadbImage = "mariadb:12.3.2-noble"
-	redisImage   = "redis:8.10.1-alpine"
+	mariadbImage    = "mariadb:12.3.2-noble"
+	redisImage      = "redis:8.10.1-alpine"
+	dbContainerName = "teams-tasks-mariadb-test-container"
 )
 
 // ---- Конструкторы для Nullable ----
@@ -44,16 +47,20 @@ func Undef[T any]() model.Nullable[T] {
 	return model.Nullable[T]{}
 }
 
-// ---- Запуск тестовой БД ----
+type DBContainer struct {
+	Container testcontainers.Container
+	Host      string
+	Port      string
+	DB        *database.DB
+}
 
-// StartTestDatabase поднимает контейнер MariaDB, применяет миграции и возвращает *sql.DB
-// и функцию для остановки/очистки.
-func StartTestDatabase(t *testing.T) (*database.DB, func()) {
+func StartTestDBContainer(t *testing.T) (*DBContainer, func()) {
 	ctx := context.Background()
 	containerLogger := log.New(io.Discard, "", 0)
 
 	req := testcontainers.ContainerRequest{
 		Image:        mariadbImage,
+		Name:         dbContainerName,
 		ExposedPorts: []string{"3306/tcp"},
 		Env: map[string]string{
 			"MYSQL_ROOT_PASSWORD": "testroot",
@@ -68,6 +75,7 @@ func StartTestDatabase(t *testing.T) (*database.DB, func()) {
 		ContainerRequest: req,
 		Started:          true,
 		Logger:           containerLogger,
+		Reuse:            true,
 	})
 	be.Err(t, err, nil)
 
@@ -79,8 +87,60 @@ func StartTestDatabase(t *testing.T) (*database.DB, func()) {
 	db, err := database.Open(ctx, database.Config{
 		Addr:     fmt.Sprintf("%s:%s", host, port.Port()),
 		DBName:   "testdb",
-		User:     "testuser",
-		Password: "testpass",
+		User:     "root",
+		Password: "testroot",
+	})
+	be.Err(t, err, nil)
+
+	cleanup := func() {
+		if err := db.Close(); err != nil {
+			t.Log(err)
+		}
+		if err := container.Terminate(ctx); err != nil {
+			t.Log(err)
+		}
+	}
+
+	return &DBContainer{
+		Container: container,
+		Host:      host,
+		Port:      port.Port(),
+		DB:        db,
+	}, cleanup
+}
+
+// ---- Запуск тестовой БД ----
+
+func uniqueDBName(t *testing.T) string {
+	base := strings.TrimPrefix(t.Name(), TestMainPreffix)
+	base = strings.ReplaceAll(base, "/", "_")
+	base = strings.ReplaceAll(base, " ", "_")
+	return base + "_" + randomString(8)
+}
+
+func randomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+// StartTestDatabase поднимает контейнер MariaDB, применяет миграции и возвращает *sql.DB
+// и функцию для остановки/очистки.
+func (c *DBContainer) StartTestDatabase(t *testing.T) (*database.DB, func()) {
+	ctx := context.Background()
+
+	dbName := uniqueDBName(t)
+	_, err := c.DB.ExecContext(ctx, "CREATE DATABASE "+dbName)
+	be.Err(t, err, nil)
+
+	db, err := database.Open(ctx, database.Config{
+		Addr:     fmt.Sprintf("%s:%s", c.Host, c.Port),
+		DBName:   dbName,
+		User:     "root",
+		Password: "testroot",
 	})
 	be.Err(t, err, nil)
 
@@ -89,11 +149,24 @@ func StartTestDatabase(t *testing.T) (*database.DB, func()) {
 	be.Err(t, goose.Up(db.DB(), "../migrations"), nil)
 
 	cleanup := func() {
-		db.Close()
-		container.Terminate(ctx)
+		if err := db.Close(); err != nil {
+			t.Log(err)
+		}
+		if _, err := c.DB.ExecContext(ctx, "DROP DATABASE "+dbName); err != nil {
+			t.Log(err)
+		}
 	}
 
 	return db, cleanup
+}
+
+func (c *DBContainer) Run(t *testing.T, name string, fn func(t *testing.T, db *database.DB)) {
+	t.Run(name, func(t *testing.T) {
+		t.Parallel()
+		db, cleanup := c.StartTestDatabase(t)
+		t.Cleanup(cleanup)
+		fn(t, db)
+	})
 }
 
 // ---- Вспомогательные функции для вставки данных ----
@@ -195,8 +268,12 @@ func StartTestRedis(t *testing.T) (*redis.Client, func()) {
 	be.Err(t, err, nil)
 
 	cleanup := func() {
-		client.Close()
-		_ = container.Terminate(ctx)
+		if err := client.Close(); err != nil {
+			t.Log(err)
+		}
+		if err := container.Terminate(ctx); err != nil {
+			t.Log(err)
+		}
 	}
 
 	return client, cleanup

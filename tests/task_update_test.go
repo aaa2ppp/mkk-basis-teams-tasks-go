@@ -6,19 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTaskUpdate проверяет права доступа, версионность и историю при обновлении задачи.
-func TestTaskUpdate(t *testing.T) {
+// testTaskUpdate проверяет права доступа, версионность и историю при обновлении задачи.
+func testTaskUpdate(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	// Хранилище, транзактор, сервис (кеш — заглушка)
 	taskStorage := tasks.NewStorage(db)

@@ -5,19 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTaskPagination проверяет пагинацию списка задач: limit, cursor, next_cursor.
-func TestTaskPagination(t *testing.T) {
+// testTaskPagination проверяет пагинацию списка задач: limit, cursor, next_cursor.
+func testTaskPagination(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	// Подготовка хранилища и сервиса с заглушкой кеша
 	taskStorage := tasks.NewStorage(db)

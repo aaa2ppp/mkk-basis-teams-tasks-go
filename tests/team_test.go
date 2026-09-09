@@ -4,19 +4,17 @@ import (
 	"context"
 	"testing"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/teams"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTeamCreate проверяет создание команды и автоматическое назначение создателя владельцем.
-func TestTeamCreate(t *testing.T) {
+// testTeamCreate проверяет создание команды и автоматическое назначение создателя владельцем.
+func testTeamCreate(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	storage := teams.NewStorage(db)
 	svc := teams.NewService(storage, db)
@@ -39,11 +37,9 @@ func TestTeamCreate(t *testing.T) {
 	be.Equal(t, members[0].Role, model.RoleOwner)
 }
 
-// TestTeamList проверяет, что пользователь видит только свои команды.
-func TestTeamList(t *testing.T) {
+// testTeamList проверяет, что пользователь видит только свои команды.
+func testTeamList(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	storage := teams.NewStorage(db)
 	svc := teams.NewService(storage, db)
@@ -85,11 +81,9 @@ func TestTeamList(t *testing.T) {
 	}
 }
 
-// TestTeamAddMember проверяет права на добавление участников и запрет на выдачу роли owner.
-func TestTeamAddMember(t *testing.T) {
+// testTeamAddMember проверяет права на добавление участников и запрет на выдачу роли owner.
+func testTeamAddMember(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	storage := teams.NewStorage(db)
 	svc := teams.NewService(storage, db)

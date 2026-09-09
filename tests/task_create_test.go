@@ -4,20 +4,18 @@ import (
 	"context"
 	"testing"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTaskCreate проверяет, что создавать задачи могут только участники команды,
+// testTaskCreate проверяет, что создавать задачи могут только участники команды,
 // и что назначенный исполнитель должен быть участником.
-func TestTaskCreate(t *testing.T) {
+func testTaskCreate(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	taskStorage := tasks.NewStorage(db)
 	cache := &NoopCache{}

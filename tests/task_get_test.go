@@ -5,19 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTaskGet проверяет доступ к задаче по ID, включая опции withComments и withHistory.
-func TestTaskGet(t *testing.T) {
+// testTaskGet проверяет доступ к задаче по ID, включая опции withComments и withHistory.
+func testTaskGet(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	taskStorage := tasks.NewStorage(db)
 	cache := &NoopCache{}

@@ -6,20 +6,18 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/teams"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestSQLReport - интеграционный тест для SQL-отчёта /teams/{id}/stats.
+// testSQLReport - интеграционный тест для SQL-отчёта /teams/{id}/stats.
 // Проверяет корректность метрик: статусы задач, топ-3 исполнителей по закрытым задачам за 30 дней,
 // среднее время закрытия, общее количество комментариев.
-func TestSQLReport(t *testing.T) {
+func testSQLReport(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	// Подготовка хранилища и транзактора.
 	teamStorage := teams.NewStorage(db)

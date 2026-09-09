@@ -6,22 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestUpdateRejectsVersionZero доказывает, что сервис отклоняет обновление
+// testTaskUpdateVersionZero доказывает, что сервис отклоняет обновление
 // с Version=0, даже если вызов идёт напрямую (минуя HTTP/API-валидатор).
 // Это страхует от регрессии: если кто-то уберёт проверку из apiUpdateReq.Validate(),
 // сервис всё равно останется защищённым.
-func TestUpdateRejectsVersionZero(t *testing.T) {
+func testTaskUpdateVersionZero(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	storage := tasks.NewStorage(db)
 	svc := tasks.NewService(storage, db, &NoopCache{})

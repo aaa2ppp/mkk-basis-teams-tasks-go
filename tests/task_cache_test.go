@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
 	"github.com/aaa2ppp/be/tb"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/redis/go-redis/v9"
 )
 
 // CountingStorage — обёртка над Storage, считающая вызовы List.
@@ -30,15 +31,9 @@ func (c *CountingStorage) List(ctx context.Context, req tasks.DBListReq) ([]mode
 	return c.Storage.List(ctx, req)
 }
 
-// TestCache проверяет работу кеша для метода List: кеширование, инвалидация при Create/Update.
-func TestCache(t *testing.T) {
+// testCache проверяет работу кеша для метода List: кеширование, инвалидация при Create/Update.
+func testCache(t *testing.T, db *db.DB, redisClient *redis.Client) {
 	ctx := context.Background()
-
-	// Поднимаем БД и Redis
-	db, dbCleanup := StartTestDatabase(t)
-	defer dbCleanup()
-	redisClient, redisCleanup := StartTestRedis(t)
-	defer redisCleanup()
 
 	// Создаём хранилище с обёрткой-счётчиком
 	realStorage := tasks.NewStorage(db)

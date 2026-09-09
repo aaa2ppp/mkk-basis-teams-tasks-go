@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 // TODO: не все роли покрыты. В контексте задачи есть:
@@ -19,10 +19,8 @@ import (
 // не член команды
 
 // TestTaskAddComment проверяет, что комментарии могут добавлять только участники команды.
-func TestTaskAddComment(t *testing.T) {
+func testTaskAddComment(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	taskStorage := tasks.NewStorage(db)
 	cache := &NoopCache{}

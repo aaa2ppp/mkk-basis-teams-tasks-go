@@ -5,20 +5,18 @@ import (
 	"testing"
 	"time"
 
+	"aaa2ppp/teams-tasks/internal/db"
 	"aaa2ppp/teams-tasks/internal/features/tasks"
 	"aaa2ppp/teams-tasks/internal/lib/auth"
 	"aaa2ppp/teams-tasks/internal/model"
 
 	"github.com/aaa2ppp/be"
 	"github.com/aaa2ppp/be/tb"
-	_ "github.com/go-sql-driver/mysql"
 )
 
-// TestTaskUpdateExtended проверяет дополнительные сценарии обновления.
-func TestTaskUpdateExtended(t *testing.T) {
+// testTaskUpdateExtended проверяет дополнительные сценарии обновления.
+func testTaskUpdateExtended(t *testing.T, db *db.DB) {
 	ctx := context.Background()
-	db, cleanup := StartTestDatabase(t)
-	defer cleanup()
 
 	taskStorage := tasks.NewStorage(db)
 	cache := &NoopCache{}
