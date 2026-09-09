@@ -14,15 +14,21 @@ import (
 type cache struct {
 	redis      *redis.Client
 	ttlSeconds int64
+	prefix     string
 }
 
 var _ Cache = &cache{}
 
-func NewCache(rdb *redis.Client, ttl time.Duration) *cache {
-	return &cache{redis: rdb, ttlSeconds: int64(ttl / time.Second)}
+func NewCache(rdb *redis.Client, ttl time.Duration, prefix string) *cache {
+	return &cache{
+		redis:      rdb,
+		ttlSeconds: int64(ttl / time.Second),
+		prefix:     prefix,
+	}
 }
 
 func (c cache) Get(ctx context.Context, key, field string, val any) error {
+	key = c.prefix + key
 	data, err := c.redis.HGet(ctx, key, field).Bytes()
 	if err != nil {
 		if err == redis.Nil {
@@ -40,6 +46,7 @@ func (c cache) Get(ctx context.Context, key, field string, val any) error {
 }
 
 func (c cache) Put(ctx context.Context, key string, field string, val any) error {
+	key = c.prefix + key
 	data, err := json.Marshal(val)
 	if err != nil {
 		return fmt.Errorf("cache marshal: %w", err)
@@ -59,5 +66,6 @@ func (c cache) Put(ctx context.Context, key string, field string, val any) error
 }
 
 func (c cache) Del(ctx context.Context, key string) error {
+	key = c.prefix + key
 	return c.redis.Del(ctx, key).Err()
 }

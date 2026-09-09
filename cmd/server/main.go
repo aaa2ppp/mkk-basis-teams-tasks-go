@@ -203,7 +203,7 @@ func newTasksAPI(c tasksAPIConfig) http.Handler {
 			tasks.NewService(
 				tasks.NewStorage(c.DB),
 				c.DB,
-				tasks.NewCache(c.RDB, c.CacheTTL),
+				tasks.NewCache(c.RDB, c.CacheTTL, "tasks:"),
 			),
 		),
 	)

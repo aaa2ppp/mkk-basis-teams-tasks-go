@@ -40,7 +40,8 @@ func testCache(t *testing.T, db *db.DB, redisClient *redis.Client) {
 	countingStorage := &CountingStorage{Storage: realStorage}
 
 	// Кеш с TTL 5 минут (для теста достаточно)
-	cache := tasks.NewCache(redisClient, 5*time.Minute)
+	prefix := randomString(8)
+	cache := tasks.NewCache(redisClient, 5*time.Minute, prefix)
 
 	// Сервис задач
 	svc := tasks.NewService(countingStorage, db, cache)
@@ -260,7 +261,7 @@ func testCache(t *testing.T, db *db.DB, redisClient *redis.Client) {
 
 	t.Run("cache ttl", func(t *testing.T) {
 		// Создаём кеш с TTL = 1 секунда
-		shortCache := tasks.NewCache(redisClient, 1*time.Second)
+		shortCache := tasks.NewCache(redisClient, 1*time.Second, randomString(8))
 		svc = tasks.NewService(countingStorage, db, shortCache)
 
 		req := tasks.SvcListReq{TeamID: teamID, Limit: 10}

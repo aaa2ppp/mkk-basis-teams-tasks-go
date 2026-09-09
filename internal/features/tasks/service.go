@@ -118,7 +118,7 @@ type Cache interface {
 }
 
 func buildCacheKey(teamID model.TeamID) string {
-	return fmt.Sprintf("tasks:team:%d", teamID)
+	return fmt.Sprintf("team:%d", teamID)
 }
 
 func buildCacheField(req SvcListReq) string {
@@ -135,7 +135,7 @@ func buildCacheField(req SvcListReq) string {
 	if req.Limit != 0 {
 		fmt.Fprintf(&kb, ":limit:%d", req.Limit)
 	}
-	return kb.String()
+	return strings.TrimPrefix(kb.String(), ":")
 }
 
 func (s *service) invalidateCache(ctx context.Context, teamID model.TeamID) error {

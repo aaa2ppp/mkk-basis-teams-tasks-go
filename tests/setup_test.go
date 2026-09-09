@@ -23,9 +23,10 @@ import (
 )
 
 const (
-	mariadbImage    = "mariadb:12.3.2-noble"
-	redisImage      = "redis:8.10.1-alpine"
-	dbContainerName = "teams-tasks-mariadb-test-container"
+	mariadbImage       = "mariadb:12.3.2-noble"
+	redisImage         = "redis:8.10.1-alpine"
+	dbContainerName    = "teams-tasks-mariadb-test-container"
+	redisContainerName = "teams-tasks-redis-test-container"
 )
 
 // ---- Конструкторы для Nullable ----
@@ -246,6 +247,7 @@ func StartTestRedis(t *testing.T) (*redis.Client, func()) {
 
 	req := testcontainers.ContainerRequest{
 		Image:        redisImage,
+		Name:         redisContainerName,
 		ExposedPorts: []string{"6379/tcp"},
 		WaitingFor:   wait.ForLog("Ready to accept connections"),
 	}
@@ -253,6 +255,7 @@ func StartTestRedis(t *testing.T) (*redis.Client, func()) {
 		ContainerRequest: req,
 		Started:          true,
 		Logger:           containerLogger,
+		Reuse:            true,
 	})
 	be.Err(t, err, nil)
 
