@@ -483,7 +483,7 @@ func (s *storage) GetMemberRole(ctx context.Context, req DBGetMemberRoleReq) (mo
 
 	var role model.Role
 	if err := row.Scan(&role); err != nil {
-		if err := sql.ErrNoRows; err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, model.ErrNotFound
 		}
 		return 0, err
